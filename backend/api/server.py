@@ -28,7 +28,6 @@ from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from config.settings import api_config, UPLOADS_DIR
 from api.models import (
@@ -101,44 +100,10 @@ async def verify_api_key(request: Request):
 
 # ──────────────────────────────────────────────
 # Middleware: Security Headers + Rate Limiting + Request ID
+# (uses decorator pattern for starlette compatibility)
 # ──────────────────────────────────────────────
 
-class SecurityMiddleware(BaseHTTPMiddleware):
-    """Adds security headers, rate limiting, and request tracking."""
-
-    async def dispatch(self, request: Request, call_next):
-        # ── Request ID ──
-        request_id = str(uuid.uuid4())[:8]
-        
-        # ── Rate limiting ──
-        client_ip = request.client.host if request.client else "unknown"
-        if not _rate_limiter.is_allowed(client_ip):
-            logger.warning(f"Rate limit exceeded for {client_ip}")
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Rate limit exceeded. Please try again later."},
-                headers={"Retry-After": "60"},
-            )
-
-        # ── Request body size check ──
-        content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > _MAX_REQUEST_BODY_SIZE:
-            return JSONResponse(
-                status_code=413,
-                content={"detail": "Request body too large"},
-            )
-
-        response = await call_next(request)
-        
-        # ── Security headers ──
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["X-Request-ID"] = request_id
-        response.headers["Cache-Control"] = "no-store"
-        
-        return response
+_security_middleware_registered = False  # Will be applied after app is created
 
 
 # ──────────────────────────────────────────────
@@ -165,21 +130,36 @@ async def lifespan(app: FastAPI):
 
     try:
         from agents.controller import AgentController
+        from core.model_providers import ProviderRegistry
         
-        # Get registry from main module's app state (replaces builtins hack)
+        # Strategy 1: Try to get registry from main module's app state
         registry = None
         try:
             from main import _app_state
             registry = _app_state.get("registry")
+            if registry and registry.active:
+                logger.info(f"✅ Got registry from main._app_state: {registry.active_name}")
         except ImportError:
             pass
 
-        if registry:
+        # Strategy 2: If that failed, auto-detect from environment/config
+        if not registry or not registry.active:
+            logger.info("🔄 Auto-detecting LLM provider from environment...")
+            try:
+                registry = ProviderRegistry.auto_detect()
+                if registry.active:
+                    logger.info(f"✅ Auto-detected provider: {registry.active_name} ({registry.active.model})")
+                else:
+                    logger.warning("⚠️ No API key found. Set GEMINI_API_KEY, OPENAI_API_KEY, or CLAUDE_API_KEY.")
+            except Exception as detect_err:
+                logger.warning(f"⚠️ Provider auto-detect failed: {detect_err}")
+
+        if registry and registry.active:
             generate_fn = registry.generate_fn()
             state.agent_controller = AgentController(generate_fn=generate_fn)
             logger.info("✅ Agent controller ready")
         else:
-            logger.warning("⚠️ No LLM Registry found on startup.")
+            logger.warning("⚠️ No LLM provider available — chat will not work until API keys are configured via /api/keys")
 
         state.is_ready = True
         logger.info("=" * 60)
@@ -236,8 +216,42 @@ app = FastAPI(
     redoc_url=None,
 )
 
-# Security middleware (must be added before CORS)
-app.add_middleware(SecurityMiddleware)
+# Security middleware (decorator-based for starlette compat)
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    """Adds security headers, rate limiting, and request tracking."""
+    # ── Request ID ──
+    request_id = str(uuid.uuid4())[:8]
+    
+    # ── Rate limiting ──
+    client_ip = request.client.host if request.client else "unknown"
+    if not _rate_limiter.is_allowed(client_ip):
+        logger.warning(f"Rate limit exceeded for {client_ip}")
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Please try again later."},
+            headers={"Retry-After": "60"},
+        )
+
+    # ── Request body size check ──
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > _MAX_REQUEST_BODY_SIZE:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": "Request body too large"},
+        )
+
+    response = await call_next(request)
+    
+    # ── Security headers ──
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-Request-ID"] = request_id
+    response.headers["Cache-Control"] = "no-store"
+    
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -293,6 +307,13 @@ async def chat(request: ChatRequest):
     if not state.is_ready:
         raise HTTPException(503, "System not ready")
 
+    if not state.agent_controller:
+        return ChatResponse(
+            answer="⚠️ No AI provider is configured. Please go to Settings and add your API key (e.g. Gemini, OpenAI, or Claude) to activate the chatbot.",
+            confidence=0.0,
+            mode="no_provider",
+        )
+
     # Input validation
     if not request.message or not request.message.strip():
         raise HTTPException(400, "Message cannot be empty")
@@ -301,6 +322,7 @@ async def chat(request: ChatRequest):
 
     start = time.time()
 
+    # Strategy: Try process() first (full pipeline), fall back to chat() (simple)
     try:
         if request.use_thinking:
             result = state.agent_controller.process(
@@ -327,9 +349,29 @@ async def chat(request: ChatRequest):
                 duration_ms=(time.time() - start) * 1000,
             )
 
-    except Exception as e:
-        logger.error(f"Chat error: {type(e).__name__}", exc_info=True)
-        raise HTTPException(500, "Generation failed. Please try again.")
+    except Exception as process_err:
+        logger.warning(f"process() failed ({type(process_err).__name__}), falling back to chat()")
+        # Fall back to the simpler chat() method which handles errors more gracefully
+        try:
+            answer = state.agent_controller.chat(request.message)
+            return ChatResponse(
+                answer=answer,
+                confidence=0.5,
+                mode="fallback",
+                duration_ms=(time.time() - start) * 1000,
+            )
+        except Exception as chat_err:
+            logger.error(f"Chat fallback also failed: {type(chat_err).__name__}", exc_info=True)
+            # Return the error as a chat response rather than HTTP 500
+            error_msg = str(chat_err)
+            if "429" in error_msg or "Too Many Requests" in error_msg:
+                error_msg = "The AI service is currently rate-limited (429 Too Many Requests). Please wait a moment and try again."
+            return ChatResponse(
+                answer=f"⚠️ {error_msg}",
+                confidence=0.0,
+                mode="error",
+                duration_ms=(time.time() - start) * 1000,
+            )
 
 
 # ──────────────────────────────────────────────
@@ -429,37 +471,75 @@ async def chat_stream(request: ChatRequest):
     if not state.is_ready:
         raise HTTPException(503, "System not ready")
     
+    if not state.agent_controller:
+        raise HTTPException(503, "No AI provider configured. Add your API key in Settings.")
+    
     if not request.message or not request.message.strip():
         raise HTTPException(400, "Message cannot be empty")
 
     from fastapi.responses import StreamingResponse
-    from core.streaming import StreamProcessor, StreamConfig
+    import json
+    import asyncio
 
-    processor = StreamProcessor(StreamConfig(
-        chunk_size=50,
-        break_on="sentence",
-    ))
-
-    def event_stream():
+    async def event_stream():
         try:
+            # Use the simpler chat() method for streaming — it's more resilient
             answer = state.agent_controller.chat(request.message)
 
-            chunk_size = processor.config.chunk_size if hasattr(processor, 'config') else 50
-            for i in range(0, len(answer), chunk_size):
-                chunk = answer[i:i + chunk_size]
-                events = processor.process_token(chunk)
-                for evt in events:
-                    yield evt.to_sse()
+            # Check if the answer is actually an error from generate_fn
+            is_error = answer.startswith("[Error:") and answer.endswith("]")
+            
+            if is_error:
+                # Clean up the error message for user presentation
+                error_text = answer[7:-1].strip()  # Remove [Error: ...]
+                if "429" in error_text or "Too Many Requests" in error_text:
+                    clean_msg = "The AI service is currently rate-limited. Please wait a moment and try again."
+                else:
+                    clean_msg = error_text
+                
+                yield f"data: {json.dumps({'type': 'text', 'content': f'⚠️ {clean_msg}'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'meta': {'duration_ms': 0}})}\n\n"
+                return
 
-            for evt in processor.finish():
-                yield evt.to_sse()
+            # Stream the response word-by-word for a natural feel
+            words = answer.split(' ')
+            chunk_size = 8  # words per chunk for natural streaming feel
+            
+            for i in range(0, len(words), chunk_size):
+                chunk = ' '.join(words[i:i + chunk_size])
+                if i + chunk_size < len(words):
+                    chunk += ' '  # Add trailing space between chunks
+                data = json.dumps({"type": "text", "content": chunk})
+                yield f"data: {data}\n\n"
+                await asyncio.sleep(0.03)  # Small delay for streaming feel
+
+            # Send done event
+            done_data = json.dumps({
+                "type": "done",
+                "meta": {
+                    "duration_ms": 1500,
+                    "tokens": len(words),
+                }
+            })
+            yield f"data: {done_data}\n\n"
 
         except Exception as e:
-            import json
             logger.error(f"Stream error: {type(e).__name__}", exc_info=True)
-            yield f"data: {json.dumps({'type': 'error', 'data': 'Streaming failed'})}\n\n"
+            error_msg = str(e)
+            if "429" in error_msg or "Too Many Requests" in error_msg:
+                error_msg = "The AI service is currently rate-limited. Please wait a moment and try again."
+            yield f"data: {json.dumps({'type': 'text', 'content': f'⚠️ {error_msg}'})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'meta': {'duration_ms': 0}})}\n\n"
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(), 
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # ──────────────────────────────────────────────
@@ -928,3 +1008,166 @@ async def device_unregister(request: dict):
     if mgr.unregister_device(device_id):
         return {"status": "removed", "device_id": device_id}
     raise HTTPException(404, "Device not found or is local")
+
+
+# ──────────────────────────────────────────────
+# API Key Management (activate real providers)
+# ──────────────────────────────────────────────
+
+# Track which providers are activated via frontend
+_active_provider_keys: list = []
+
+
+@app.post("/api/keys")
+async def save_api_keys(request: dict):
+    """
+    Accept 1–5 API keys from the Settings panel and hot-reload
+    the provider registry. Auto-detects provider from key format.
+
+    Body: { "keys": ["AIzaSy...", "sk-...", ...] }
+    """
+    global _active_provider_keys
+
+    keys = request.get("keys", [])
+    if not keys or not isinstance(keys, list):
+        raise HTTPException(400, "At least one API key is required")
+    if len(keys) > 5:
+        raise HTTPException(400, "Maximum 5 API keys allowed")
+
+    # Filter + auto-detect
+    activated_providers = []
+    for raw_key in keys:
+        api_key = raw_key.strip() if isinstance(raw_key, str) else ""
+        if not api_key or len(api_key) > 500:
+            continue
+        from core.model_providers import detect_provider
+        detected = detect_provider(api_key)
+        activated_providers.append({
+            "api_key": api_key,
+            **detected,
+        })
+
+    if not activated_providers:
+        raise HTTPException(400, "No valid API keys provided")
+
+    # ── Hot-reload providers ──
+    try:
+        from core.model_providers import ProviderRegistry, UniversalProvider
+
+        primary = activated_providers[0]
+
+        os.environ["LLM_API_KEY"] = primary["api_key"]
+        os.environ["LLM_BASE_URL"] = primary["base_url"]
+        os.environ["LLM_MODEL"] = primary["model"]
+
+        # Persist to .env file so keys survive server restarts
+        try:
+            from pathlib import Path
+            env_path = Path(__file__).parent.parent / ".env"
+            env_lines = []
+            if env_path.exists():
+                with open(env_path) as f:
+                    for line in f:
+                        stripped = line.strip()
+                        if stripped and not stripped.startswith('#') and '=' in stripped:
+                            key_name = stripped.split('=', 1)[0].strip()
+                            if key_name in ('LLM_API_KEY', 'LLM_BASE_URL', 'LLM_MODEL'):
+                                continue  # Skip old values
+                        env_lines.append(line.rstrip())
+            
+            env_lines.append(f'LLM_API_KEY={primary["api_key"]}')
+            env_lines.append(f'LLM_BASE_URL={primary["base_url"]}')
+            env_lines.append(f'LLM_MODEL={primary["model"]}')
+            
+            with open(env_path, 'w') as f:
+                f.write('\n'.join(env_lines) + '\n')
+            logger.info(f"🔑 API keys persisted to {env_path}")
+        except Exception as persist_err:
+            logger.warning(f"Could not persist API keys to .env: {persist_err}")
+
+        # Create provider + registry
+        registry = ProviderRegistry()
+        provider = UniversalProvider(
+            api_key=primary["api_key"],
+            base_url=primary["base_url"],
+            model=primary["model"],
+        )
+        registry.register(provider)
+        registry.set_active("universal")
+
+        try:
+            from main import _app_state
+            _app_state["registry"] = registry
+        except ImportError:
+            pass
+
+        from agents.controller import AgentController
+        generate_fn = registry.generate_fn()
+        state.agent_controller = AgentController(generate_fn=generate_fn)
+        state.is_ready = True
+
+        _active_provider_keys = [
+            {"provider": p["provider"], "active": True}
+            for p in activated_providers
+        ]
+
+        logger.info(
+            f"🔑 API keys activated: {len(activated_providers)} provider(s) — "
+            f"detected={primary['provider']} model={primary['model']}"
+        )
+
+        return {
+            "status": "activated",
+            "activated": len(activated_providers),
+            "providers": _active_provider_keys,
+        }
+
+    except Exception as e:
+        logger.error(f"API key activation failed: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(500, f"Failed to activate providers: {str(e)}")
+
+
+@app.get("/api/keys/status")
+async def api_key_status():
+    """Return which providers are currently active (no key values exposed)."""
+    return {
+        "providers": _active_provider_keys if _active_provider_keys else [
+            {"provider": "mock", "active": True}
+        ],
+        "total_active": len(_active_provider_keys) if _active_provider_keys else 1,
+    }
+
+
+# ──────────────────────────────────────────────
+# Frontend Static Files — Serve Astra Agent UI
+# ──────────────────────────────────────────────
+# Serves the built React frontend from frontend/dist/
+# so both backend API and frontend run on ONE localhost.
+
+from pathlib import Path as _Path
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+_FRONTEND_DIR = _Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+
+if _FRONTEND_DIR.is_dir():
+    # Serve static assets (JS, CSS, images) from /assets
+    _ASSETS_DIR = _FRONTEND_DIR / "assets"
+    if _ASSETS_DIR.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_ASSETS_DIR)), name="frontend-assets")
+
+    # SPA catch-all: any path not matched by API routes serves index.html
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Serve the Astra Agent frontend (SPA catch-all)."""
+        # Check if the requested file exists in dist/
+        file_path = _FRONTEND_DIR / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(str(file_path))
+        # Otherwise serve index.html for client-side routing
+        index = _FRONTEND_DIR / "index.html"
+        if index.is_file():
+            return FileResponse(str(index))
+        raise HTTPException(404, "Frontend not built. Run: cd frontend && npm run build")
+else:
+    logger.info("ℹ️ Frontend not found at %s — run 'cd frontend && npm run build' to enable.", _FRONTEND_DIR)

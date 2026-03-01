@@ -140,31 +140,71 @@ class ModelProvider(ABC):
 
 
 # ──────────────────────────────────────────────
+# Auto-detect provider from API key pattern
+# ──────────────────────────────────────────────
+
+def detect_provider(api_key: str) -> Dict[str, str]:
+    """
+    Auto-detect provider config from API key format.
+    Returns {"provider", "base_url", "model"}.
+    """
+    key = api_key.strip()
+
+    if key.startswith("sk-ant-"):
+        return {
+            "provider": "anthropic",
+            "base_url": "https://api.anthropic.com/v1",
+            "model": "claude-3-5-sonnet-20241022",
+        }
+    elif key.startswith("AIzaSy"):
+        return {
+            "provider": "gemini",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+            "model": "gemini-2.0-flash",
+        }
+    elif key.startswith("sk-"):
+        return {
+            "provider": "openai",
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-4o",
+        }
+    else:
+        # Generic — assume OpenAI-compatible
+        return {
+            "provider": "generic",
+            "base_url": "https://api.openai.com/v1",
+            "model": "gpt-4o",
+        }
+
+
+# ──────────────────────────────────────────────
 # 1. Universal Provider
 # ──────────────────────────────────────────────
 
 class UniversalProvider(ModelProvider):
-    """Universal OpenAI-compatible API provider."""
+    """Universal OpenAI-compatible API provider using httpx directly."""
 
     def __init__(self, api_key: str, base_url: str, model: str):
         super().__init__(name="universal", model=model)
         self._api_key = api_key
-        self._base_url = base_url
+        self._base_url = base_url.rstrip("/")
+        self._provider_hint = ""  # e.g. "gemini", "openai"
         self._client = None
         self._init_client()
 
     def _init_client(self):
         try:
-            import openai
-            self._client = openai.OpenAI(
-                api_key=self._api_key or "sk-no-key",  # some local providers don't need a key
-                base_url=self._base_url
+            import httpx
+            self._client = httpx.Client(timeout=120.0)
+            # Auto-detect provider hint from key
+            detected = detect_provider(self._api_key)
+            self._provider_hint = detected["provider"]
+            logger.info(
+                f"✅ Universal provider initialized — "
+                f"detected={self._provider_hint} url={self._base_url} model={self.model}"
             )
-            logger.info(f"✅ Universal provider initialized — url={self._base_url} model={self.model}")
         except ImportError:
-            logger.error(
-                "❌ openai not installed. Run: pip install openai"
-            )
+            logger.error("❌ httpx not installed. Run: pip install httpx")
             self._client = None
         except Exception as e:
             logger.error(f"❌ Universal init failed: {e}")
@@ -182,36 +222,67 @@ class UniversalProvider(ModelProvider):
             return GenerationResult(error="Universal client not initialized")
 
         start = time.time()
-        try:
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
+        max_retries = 3
+        base_delay = 2.0
+        
+        for attempt in range(max_retries):
+            try:
+                import httpx
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
 
-            response = self._client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+                url = f"{self._base_url}/chat/completions"
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self._api_key}",
+                }
+                payload: Dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                }
 
-            latency = (time.time() - start) * 1000
-            text = response.choices[0].message.content or ""
-            token_count = response.usage.total_tokens if response.usage else 0
+                # Provider-specific parameter handling
+                if self._provider_hint == "gemini":
+                    # Gemini rejects max_tokens, uses its own defaults
+                    pass
+                else:
+                    payload["max_tokens"] = max_tokens
 
-            self._track(latency)
-            return GenerationResult(
-                text=text,
-                provider="universal",
-                model=self.model,
-                tokens_used=token_count,
-                latency_ms=latency,
-            )
-        except Exception as e:
-            latency = (time.time() - start) * 1000
-            self._track(latency, error=True)
-            logger.error(f"Universal generate error: {e}")
-            return GenerationResult(error=str(e), provider="universal")
+                response = self._client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+
+                latency = (time.time() - start) * 1000
+                text = data["choices"][0]["message"]["content"] or ""
+                token_count = data.get("usage", {}).get("total_tokens", 0)
+
+                self._track(latency)
+                return GenerationResult(
+                    text=text,
+                    provider="universal",
+                    model=self.model,
+                    tokens_used=token_count,
+                    latency_ms=latency,
+                )
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429 and attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Rate limited (429). Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                    time.sleep(delay)
+                    continue
+                else:
+                    latency = (time.time() - start) * 1000
+                    self._track(latency, error=True)
+                    logger.error(f"Universal generate HTTP error: {e}")
+                    return GenerationResult(error=str(e), provider="universal")
+            except Exception as e:
+                latency = (time.time() - start) * 1000
+                self._track(latency, error=True)
+                logger.error(f"Universal generate error: {e}")
+                return GenerationResult(error=str(e), provider="universal")
 
     def stream(
         self,
@@ -224,25 +295,57 @@ class UniversalProvider(ModelProvider):
         if not self._client:
             return
 
-        try:
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
+        max_retries = 3
+        base_delay = 2.0
+        import httpx
+        import json
 
-            response = self._client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=True,
-            )
+        for attempt in range(max_retries):
+            try:
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
 
-            for chunk in response:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-        except Exception as e:
-            logger.error(f"Universal stream error: {e}")
+                url = f"{self._base_url}/chat/completions"
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self._api_key}",
+                }
+                payload: Dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "stream": True,
+                }
+                if self._provider_hint != "gemini":
+                    payload["max_tokens"] = max_tokens
+
+                with self._client.stream("POST", url, json=payload, headers=headers) as resp:
+                    resp.raise_for_status()
+                    for line in resp.iter_lines():
+                        if line.startswith("data: ") and line != "data: [DONE]":
+                            try:
+                                chunk = json.loads(line[6:])
+                                delta = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                                if delta:
+                                    yield delta
+                            except json.JSONDecodeError:
+                                pass
+                # If stream completes successfully, break out of retry loop
+                break
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429 and attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Rate limited (429) in stream. Retrying in {delay}s... (Attempt {attempt+1}/{max_retries})")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"Universal stream HTTP error: {e}")
+                    break
+            except Exception as e:
+                logger.error(f"Universal stream error: {e}")
+                break
 
 
 # ──────────────────────────────────────────────
@@ -368,7 +471,7 @@ class ProviderRegistry:
         base_url = provider_config.base_url
         model = provider_config.model
         
-        if api_key or base_url:
+        if api_key:
             registry.register(UniversalProvider(api_key=api_key, base_url=base_url, model=model))
             registry.set_active("universal")
         

@@ -462,11 +462,8 @@ class AgentController:
         if memory_context:
             system += f"\n\n{memory_context}"
 
-        from core.tokenizer import MistralTokenizer
-        messages = list(self.conversation[-10:])
-        messages.append({"role": "user", "content": message})
-
         try:
+            from core.tokenizer import MistralTokenizer
             tokenizer = MistralTokenizer()
             prompt = tokenizer.format_chat(messages, system_prompt=system)
         except Exception:
