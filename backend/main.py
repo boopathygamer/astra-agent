@@ -29,6 +29,8 @@ Usage:
 
 import argparse
 import logging
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -39,6 +41,43 @@ logger = logging.getLogger(__name__)
 
 # Module-level app state — replaces builtins hack
 _app_state = {"registry": None}
+
+
+def _ensure_env_file() -> None:
+    """Copy .env.example → .env if .env is missing, and warn if no provider key is set."""
+    env_file = Path(__file__).parent / ".env"
+    env_example = Path(__file__).parent / ".env.example"
+
+    if not env_file.exists():
+        if env_example.exists():
+            shutil.copy(env_example, env_file)
+            logger.warning(
+                "⚠️  No .env file found — copied .env.example to .env. "
+                "Edit backend/.env and add your API keys to activate an LLM provider."
+            )
+        else:
+            logger.warning(
+                "⚠️  No .env file found and .env.example is missing. "
+                "Set GEMINI_API_KEY, CLAUDE_API_KEY, or OPENAI_API_KEY to use an LLM provider."
+            )
+
+    # Log which provider key is active (informational)
+    active = [
+        name
+        for name, var in [
+            ("Gemini", "GEMINI_API_KEY"),
+            ("Claude", "CLAUDE_API_KEY"),
+            ("OpenAI", "OPENAI_API_KEY"),
+        ]
+        if os.getenv(var)
+    ]
+    if active:
+        logger.info("✅ LLM provider keys detected: %s", ", ".join(active))
+    else:
+        logger.warning(
+            "⚠️  No LLM provider API key detected (GEMINI_API_KEY / CLAUDE_API_KEY / OPENAI_API_KEY). "
+            "The local Mistral 7B fallback will be used if available."
+        )
 
 
 def setup_logging(level: str = "INFO"):
@@ -100,6 +139,8 @@ def start_server(provider: str = "auto", api_key: str = None, base_url: str = No
     """Start the FastAPI server."""
     import uvicorn
     from config.settings import api_config
+
+    _ensure_env_file()
 
     registry = create_provider_registry(provider, api_key, base_url)
     show_banner(registry)

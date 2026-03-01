@@ -164,12 +164,28 @@ const Navbar = () => {
   const [healthStatus, setHealthStatus] = useState<'checking' | 'online' | 'offline'>('checking');
 
   useEffect(() => {
+    let retryCount = 0;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const check = async () => {
-      try { await getHealth(); setHealthStatus('online'); } catch { setHealthStatus('offline'); }
+      try {
+        await getHealth();
+        setHealthStatus('online');
+        retryCount = 0;
+        // Schedule next routine check after 10s once online
+        timeoutId = setTimeout(check, 10000);
+      } catch {
+        retryCount++;
+        // Stay in 'checking' state while retrying so the UI shows "Connecting..."
+        setHealthStatus(retryCount >= 5 ? 'offline' : 'checking');
+        // Exponential backoff: 2s, 4s, 8s, 16s … capped at 30s
+        const delay = Math.min(2 ** retryCount * 1000, 30000);
+        timeoutId = setTimeout(check, delay);
+      }
     };
+
     check();
-    const id = setInterval(check, 10000);
-    return () => clearInterval(id);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   return (
@@ -186,7 +202,7 @@ const Navbar = () => {
                 healthStatus === 'offline' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'
               }`} />
             <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">
-              {healthStatus === 'online' ? 'Live' : healthStatus === 'offline' ? 'Offline' : '...'}
+              {healthStatus === 'online' ? 'Live' : healthStatus === 'offline' ? 'Offline' : 'Connecting...'}
             </span>
           </div>
           <button className="hidden sm:block text-sm font-medium px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 transition-colors">
