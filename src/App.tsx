@@ -52,7 +52,7 @@ const RobotBuilderCanvas = () => {
 
     // Background Grid
     const drawGrid = () => {
-      ctx.strokeStyle = 'rgba(0, 255, 65, 0.05)';
+      ctx.strokeStyle = 'rgba(0, 255, 65, 0.03)';
       ctx.lineWidth = 1;
       const size = 50;
       const offsetX = (time * 10) % size;
@@ -75,7 +75,7 @@ const RobotBuilderCanvas = () => {
       time += 0.016;
       
       // Motion blur trail
-      ctx.fillStyle = 'rgba(2, 2, 2, 0.3)';
+      ctx.fillStyle = 'rgba(2, 2, 2, 0.4)';
       ctx.fillRect(0, 0, width, height);
 
       drawGrid();
@@ -83,7 +83,7 @@ const RobotBuilderCanvas = () => {
       // Vignette
       const gradient = ctx.createRadialGradient(width/2, height/2, height/3, width/2, height/2, height);
       gradient.addColorStop(0, 'transparent');
-      gradient.addColorStop(1, 'rgba(0,0,0,0.8)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.9)');
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
     };
@@ -103,7 +103,7 @@ const RobotBuilderCanvas = () => {
     };
   }, []);
 
-  return <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none opacity-60 mix-blend-screen" />;
+  return <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-screen" />;
 };
 
 const CustomCursor = () => {

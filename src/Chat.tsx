@@ -20,7 +20,11 @@ import {
   Image as ImageIcon,
   Bot,
   Smartphone,
-  Cpu
+  Cpu,
+  Settings,
+  X,
+  User,
+  Key
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -57,6 +61,8 @@ const CustomLogo = ({ className = "w-6 h-6" }: { className?: string }) => {
 export default function Chat() {
   const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [isPlusMenuOpen, setPlusMenuOpen] = useState(false);
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'account' | 'api'>('account');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{text: string, isUser: boolean}[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -159,13 +165,16 @@ export default function Chat() {
             </div>
 
             <div className="p-3 border-t border-white/10">
-              <button className="w-full flex items-center gap-3 px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white rounded-lg transition-colors">
-                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-xs font-bold text-black">
-                  BG
+              <button 
+                onClick={() => setSettingsOpen(true)}
+                className="w-full flex items-center gap-3 px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white rounded-lg transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/80">
+                  <Settings className="w-4 h-4" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium">Boopathy Gamer</span>
-                  <span className="text-xs text-emerald-400">Pro Plan</span>
+                  <span className="font-medium">Settings</span>
+                  <span className="text-xs text-white/40">Manage account & APIs</span>
                 </div>
               </button>
             </div>
@@ -247,36 +256,36 @@ export default function Chat() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute bottom-[calc(100%-1rem)] left-4 bg-[#2f2f2f] border border-white/10 rounded-xl p-1 shadow-xl z-50 w-48"
+                className="absolute bottom-[calc(100%-1rem)] left-4 bg-[#2f2f2f] border border-white/10 rounded-lg p-1 shadow-2xl z-50 w-40"
                 ref={plusMenuRef}
               >
-                <div className="flex flex-col gap-0">
+                <div className="flex flex-col gap-0.5">
                   <button 
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors w-full text-left"
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
                     onClick={() => setPlusMenuOpen(false)}
                   >
-                    <Cpu className="w-4 h-4 text-emerald-400" />
+                    <Cpu className="w-3.5 h-3.5 text-emerald-400" />
                     Core Agent
                   </button>
                   <button 
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors w-full text-left"
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
                     onClick={() => setPlusMenuOpen(false)}
                   >
-                    <ImageIcon className="w-4 h-4 text-emerald-400" />
+                    <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
                     Images
                   </button>
                   <button 
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors w-full text-left"
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
                     onClick={() => setPlusMenuOpen(false)}
                   >
-                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <FileText className="w-3.5 h-3.5 text-emerald-400" />
                     Files
                   </button>
                   <button 
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors w-full text-left"
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
                     onClick={() => setPlusMenuOpen(false)}
                   >
-                    <BrainCircuit className="w-4 h-4 text-emerald-400" />
+                    <BrainCircuit className="w-3.5 h-3.5 text-emerald-400" />
                     Deep Researcher
                   </button>
                 </div>
@@ -321,6 +330,128 @@ export default function Chat() {
           </div>
         </div>
       </div>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSettingsOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-[#141414] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+                <h2 className="text-lg font-semibold text-white">Settings</h2>
+                <button 
+                  onClick={() => setSettingsOpen(false)}
+                  className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex flex-1 overflow-hidden">
+                {/* Sidebar */}
+                <div className="w-48 border-r border-white/10 p-4 flex flex-col gap-2">
+                  <button
+                    onClick={() => setSettingsTab('account')}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      settingsTab === 'account' 
+                        ? 'bg-white/10 text-white' 
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    Account
+                  </button>
+                  <button
+                    onClick={() => setSettingsTab('api')}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                      settingsTab === 'api' 
+                        ? 'bg-white/10 text-white' 
+                        : 'text-white/60 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <Key className="w-4 h-4" />
+                    API Keys
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+                  {settingsTab === 'account' ? (
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-2xl font-bold text-black">
+                          BG
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-medium text-white">Boopathy Gamer</h3>
+                          <p className="text-sm text-emerald-400">Pro Plan</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-white/60">Email Address</label>
+                          <input 
+                            type="email" 
+                            disabled 
+                            value="boopathygamer420@gmail.com" 
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white/50 cursor-not-allowed"
+                          />
+                        </div>
+                        <button className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-medium text-white transition-colors">
+                          Manage Subscription
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium text-white mb-1">API Configuration</h3>
+                        <p className="text-sm text-white/50 mb-6">Connect your external services to power the autonomous agent.</p>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {[
+                          { name: 'OpenAI API Key', placeholder: 'sk-proj-...' },
+                          { name: 'Anthropic API Key', placeholder: 'sk-ant-...' },
+                          { name: 'Google Gemini API Key', placeholder: 'AIzaSy...' },
+                          { name: 'Grok API Key', placeholder: 'xai-...' },
+                          { name: 'OpenRouter API Key', placeholder: 'sk-or-...' }
+                        ].map((api, idx) => (
+                          <div key={idx} className="space-y-1.5">
+                            <label className="text-sm font-medium text-white/80">{api.name}</label>
+                            <input 
+                              type="password" 
+                              placeholder={api.placeholder}
+                              className="w-full bg-[#0a0a0a] border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-2.5 text-white placeholder-white/20 outline-none transition-colors"
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="pt-4 mt-6 border-t border-white/10 flex justify-end">
+                        <button className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-lg transition-colors shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                          Connect APIs
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
