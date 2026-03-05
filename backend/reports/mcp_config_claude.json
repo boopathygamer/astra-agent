@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "superchain-agent": {
+      "command": "python",
+      "args": [
+        "-m",
+        "backend.mcp_server"
+      ],
+      "cwd": "c:\\super-system",
+      "env": {
+        "LLM_PROVIDER": "auto"
+      }
+    }
+  }
+}

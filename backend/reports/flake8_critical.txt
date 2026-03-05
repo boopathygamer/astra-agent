@@ -1,0 +1,1029 @@
+﻿
+flake8_report.txt:1:backend/agents\__in
+it__.py:2:1: F401 
+'.compiler.TaskCompiler' imported but 
+unused
+flake8_report.txt:2:backend/agents\__in
+it__.py:3:1: F401 
+'.generator.CandidateGenerator' 
+imported but unused
+flake8_report.txt:3:backend/agents\__in
+it__.py:4:1: F401 
+'.controller.AgentController' imported 
+but unused
+flake8_report.txt:4:backend/agents\comp
+iler.py:9:1: F401 'json' imported but 
+unused
+flake8_report.txt:5:backend/agents\comp
+iler.py:12:1: F401 'typing.Dict' 
+imported but unused
+flake8_report.txt:6:backend/agents\comp
+iler.py:15:1: F401 'agents.safety.conte
+nt_filter.SafetyAction' imported but 
+unused
+flake8_report.txt:13:backend/agents\con
+troller.py:41:1: F401 'typing.Any' 
+imported but unused
+flake8_report.txt:14:backend/agents\con
+troller.py:41:1: F401 'typing.Dict' 
+imported but unused
+flake8_report.txt:15:backend/agents\con
+troller.py:43:1: F401 
+'config.settings.brain_config' 
+imported but unused
+flake8_report.txt:16:backend/agents\con
+troller.py:50:1: F401 
+'agents.loop_detector.LoopSeverity' 
+imported but unused
+flake8_report.txt:17:backend/agents\con
+troller.py:57:1: F401 'agents.prompts.t
+emplates.AGENT_SYSTEM_PROMPT' imported 
+but unused
+flake8_report.txt:18:backend/agents\con
+troller.py:57:1: F401 'agents.prompts.t
+emplates.TOOL_USE_PROMPT' imported but 
+unused
+flake8_report.txt:19:backend/agents\con
+troller.py:58:1: F401 
+'core.streaming.StreamProcessor' 
+imported but unused
+flake8_report.txt:20:backend/agents\con
+troller.py:58:1: F401 
+'core.streaming.StreamEventType' 
+imported but unused
+flake8_report.txt:54:backend/agents\exp
+erts\domains.py:17:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:126:backend/agents\lo
+op_detector.py:19:1: F401 
+'dataclasses.field' imported but unused
+flake8_report.txt:127:backend/agents\lo
+op_detector.py:21:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:128:backend/agents\lo
+op_detector.py:21:1: F401 
+'typing.List' imported but unused
+flake8_report.txt:129:backend/agents\lo
+op_detector.py:21:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:137:backend/agents\pe
+rsona.py:18:1: F401 
+'dataclasses.field' imported but unused
+flake8_report.txt:143:backend/agents\pe
+rsona\twin_ingest.py:9:1: F401 'os' 
+imported but unused
+flake8_report.txt:144:backend/agents\pe
+rsona\twin_ingest.py:20:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:147:backend/agents\pe
+rsona\twin_ingest.py:37:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:173:backend/agents\pr
+oactive\archivist.py:9:1: F401 'os' 
+imported but unused
+flake8_report.txt:174:backend/agents\pr
+oactive\archivist.py:13:1: F401 
+'typing.List' imported but unused
+flake8_report.txt:175:backend/agents\pr
+oactive\archivist.py:15:1: F401 'core.m
+odel_providers.GenerationResult' 
+imported but unused
+flake8_report.txt:179:backend/agents\pr
+oactive\archivist.py:34:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:185:backend/agents\pr
+oactive\archivist.py:63:23: F541 
+f-string is missing placeholders
+flake8_report.txt:190:backend/agents\pr
+oactive\archivist.py:79:23: F541 
+f-string is missing placeholders
+flake8_report.txt:198:backend/agents\pr
+oactive\archivist.py:107:23: F541 
+f-string is missing placeholders
+flake8_report.txt:200:backend/agents\pr
+oactive\night_watch.py:24:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:226:backend/agents\pr
+oactive\night_watch.py:112:18: F541 
+f-string is missing placeholders
+flake8_report.txt:235:backend/agents\pr
+oactive\swarm_defense.py:9:1: F401 
+'sys' imported but unused
+flake8_report.txt:236:backend/agents\pr
+oactive\swarm_defense.py:16:1: F401 
+'datetime.datetime' imported but unused
+flake8_report.txt:273:backend/agents\pr
+ocess_manager.py:24:1: F401 
+'collections.deque' imported but unused
+flake8_report.txt:296:backend/agents\pr
+ofiles\contract_hunter.py:10:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:297:backend/agents\pr
+ofiles\contract_hunter.py:10:1: F401 
+'typing.Any' imported but unused
+flake8_report.txt:298:backend/agents\pr
+ofiles\contract_hunter.py:12:1: F401 'c
+ore.model_providers.GenerationResult' 
+imported but unused
+flake8_report.txt:301:backend/agents\pr
+ofiles\contract_hunter.py:44:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:311:backend/agents\pr
+ofiles\deep_researcher.py:8:1: F401 
+'os' imported but unused
+flake8_report.txt:312:backend/agents\pr
+ofiles\deep_researcher.py:12:1: F401 
+'datetime.datetime' imported but unused
+flake8_report.txt:336:backend/agents\pr
+ofiles\deep_researcher.py:73:15: F541 
+f-string is missing placeholders
+flake8_report.txt:353:backend/agents\pr
+ofiles\devils_advocate.py:10:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:354:backend/agents\pr
+ofiles\devils_advocate.py:10:1: F401 
+'typing.Any' imported but unused
+flake8_report.txt:367:backend/agents\pr
+ofiles\devops_reviewer.py:10:1: F401 
+'subprocess' imported but unused
+flake8_report.txt:373:backend/agents\pr
+ofiles\devops_reviewer.py:30:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:386:backend/agents\pr
+ofiles\migration_architect.py:8:1: 
+F401 'typing.Optional' imported but 
+unused
+flake8_report.txt:393:backend/agents\pr
+ofiles\migration_architect.py:28:1: 
+E302 expected 2 blank lines, found 1
+flake8_report.txt:406:backend/agents\pr
+ofiles\multi_agent_orchestrator.py:46:1
+: E302 expected 2 blank lines, found 1
+flake8_report.txt:418:backend/agents\pr
+ofiles\socratic_tutor.py:10:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:419:backend/agents\pr
+ofiles\socratic_tutor.py:10:1: F401 
+'typing.Any' imported but unused
+flake8_report.txt:420:backend/agents\pr
+ofiles\socratic_tutor.py:12:1: F401 'co
+re.model_providers.GenerationResult' 
+imported but unused
+flake8_report.txt:421:backend/agents\pr
+ofiles\socratic_tutor.py:14:1: F401 'ag
+ents.sandbox.environment.SandboxEnv' 
+imported but unused
+flake8_report.txt:426:backend/agents\pr
+ofiles\socratic_tutor.py:39:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:449:backend/agents\pr
+ofiles\threat_hunter.py:9:1: F401 
+'typing.List' imported but unused
+flake8_report.txt:450:backend/agents\pr
+ofiles\threat_hunter.py:9:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:451:backend/agents\pr
+ofiles\threat_hunter.py:9:1: F401 
+'typing.Any' imported but unused
+flake8_report.txt:456:backend/agents\pr
+ofiles\threat_hunter.py:37:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:469:backend/agents\pr
+ompts\__init__.py:2:1: F401 
+'.templates.AGENT_SYSTEM_PROMPT' 
+imported but unused
+flake8_report.txt:470:backend/agents\pr
+ompts\__init__.py:2:1: F401 
+'.templates.TOOL_USE_PROMPT' imported 
+but unused
+flake8_report.txt:471:backend/agents\pr
+ompts\__init__.py:2:1: F401 
+'.templates.COMPILER_PROMPT' imported 
+but unused
+flake8_report.txt:472:backend/agents\pr
+ompts\__init__.py:2:1: F401 
+'.templates.IMPROVEMENT_PROMPT' 
+imported but unused
+flake8_report.txt:473:backend/agents\pr
+ompts\__init__.py:2:1: F401 
+'.templates.CRITIC_PROMPT' imported 
+but unused
+flake8_report.txt:487:backend/agents\re
+sponse_formatter.py:16:1: F401 
+'dataclasses.field' imported but unused
+flake8_report.txt:488:backend/agents\re
+sponse_formatter.py:17:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:492:backend/agents\sa
+fety\content_filter.py:22:1: F401 
+'typing.Set' imported but unused
+flake8_report.txt:493:backend/agents\sa
+fety\content_filter.py:22:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:532:backend/agents\sa
+fety\ethics.py:20:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:533:backend/agents\sa
+fety\ethics.py:20:1: F401 'typing.Set' 
+imported but unused
+flake8_report.txt:541:backend/agents\sa
+fety\pii_guard.py:19:1: F401 
+'dataclasses.field' imported but unused
+flake8_report.txt:542:backend/agents\sa
+fety\pii_guard.py:21:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:551:backend/agents\sa
+ndbox\shadow_matrix.py:15:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:564:backend/agents\se
+ssions\__init__.py:2:1: F401 'agents.se
+ssions.manager.SessionManager' 
+imported but unused
+flake8_report.txt:565:backend/agents\se
+ssions\__init__.py:3:1: F401 
+'agents.sessions.store.SessionStore' 
+imported but unused
+flake8_report.txt:566:backend/agents\se
+ssions\__init__.py:4:1: F401 'agents.se
+ssions.tools.register_session_tools' 
+imported but unused
+flake8_report.txt:567:backend/agents\se
+ssions\manager.py:15:1: F401 'time' 
+imported but unused
+flake8_report.txt:576:backend/agents\se
+ssions\store.py:16:1: F401 'time' 
+imported but unused
+flake8_report.txt:579:backend/agents\se
+ssions\tools.py:13:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:586:backend/agents\sk
+ills\__init__.py:2:1: F401 'agents.skil
+ls.registry.SkillsRegistry' imported 
+but unused
+flake8_report.txt:591:backend/agents\to
+ols\__init__.py:2:1: F401 
+'.registry.registry' imported but 
+unused
+flake8_report.txt:592:backend/agents\to
+ols\__init__.py:2:1: F401 
+'.registry.ToolRegistry' imported but 
+unused
+flake8_report.txt:593:backend/agents\to
+ols\__init__.py:2:1: F401 
+'.registry.Tool' imported but unused
+flake8_report.txt:594:backend/agents\to
+ols\__init__.py:2:1: F401 
+'.registry.RiskLevel' imported but 
+unused
+flake8_report.txt:595:backend/agents\to
+ols\__init__.py:3:1: F401 
+'.web_search' imported but unused
+flake8_report.txt:596:backend/agents\to
+ols\__init__.py:3:1: F401 
+'.code_executor' imported but unused
+flake8_report.txt:597:backend/agents\to
+ols\__init__.py:3:1: F401 '.file_ops' 
+imported but unused
+flake8_report.txt:598:backend/agents\to
+ols\__init__.py:3:1: F401 
+'.image_analyzer' imported but unused
+flake8_report.txt:599:backend/agents\to
+ols\calculator.py:18:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:600:backend/agents\to
+ols\calculator.py:18:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:601:backend/agents\to
+ols\calculator.py:18:1: F401 
+'typing.Union' imported but unused
+flake8_report.txt:602:backend/agents\to
+ols\calculator.py:60:13: F841 local 
+variable 'allowed' is assigned to but 
+never used
+flake8_report.txt:628:backend/agents\to
+ols\code_executor.py:210:1: E305 
+expected 2 blank lines after class or 
+function definition, found 1
+flake8_report.txt:629:backend/agents\to
+ols\code_executor.py:210:1: E402 
+module level import not at top of file
+flake8_report.txt:630:backend/agents\to
+ols\code_executor.py:211:1: E402 
+module level import not at top of file
+flake8_report.txt:631:backend/agents\to
+ols\code_executor.py:213:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:632:backend/agents\to
+ols\code_executor.py:218:1: E302 
+expected 2 blank lines, found 1
+flake8_report.txt:634:backend/agents\to
+ols\data_analyzer.py:17:1: F401 're' 
+imported but unused
+flake8_report.txt:637:backend/agents\to
+ols\data_analyzer.py:179:17: F841 
+local variable 'span' is assigned to 
+but never used
+flake8_report.txt:647:backend/agents\to
+ols\doc_reader.py:8:1: F401 'os' 
+imported but unused
+flake8_report.txt:648:backend/agents\to
+ols\doc_reader.py:24:1: E302 expected 
+2 blank lines, found 1
+flake8_report.txt:672:backend/agents\to
+ols\policy.py:26:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:680:backend/agents\to
+ols\registry.py:7:1: F401 'subprocess' 
+imported but unused
+flake8_report.txt:681:backend/agents\to
+ols\registry.py:8:1: F401 'asyncio' 
+imported but unused
+flake8_report.txt:729:backend/agents\to
+ols\web_tester.py:19:1: E302 expected 
+2 blank lines, found 1
+flake8_report.txt:738:backend/agents\to
+ols\writer.py:16:1: F401 'typing.Dict' 
+imported but unused
+flake8_report.txt:762:backend/agents\to
+ols\writer.py:259:23: E128 
+continuation line under-indented for 
+visual indent
+flake8_report.txt:764:backend/agents\to
+ols\writer.py:263:35: E127 
+continuation line over-indented for 
+visual indent
+flake8_report.txt:765:backend/agents\to
+ols\writer.py:264:21: E128 
+continuation line under-indented for 
+visual indent
+flake8_report.txt:767:backend/agents\to
+ols\writer.py:268:38: E127 
+continuation line over-indented for 
+visual indent
+flake8_report.txt:768:backend/agents\to
+ols\writer.py:269:24: E128 
+continuation line under-indented for 
+visual indent
+flake8_report.txt:774:backend/api\serve
+r.py:14:1: F401 'shutil' imported but 
+unused
+flake8_report.txt:775:backend/api\serve
+r.py:16:1: F401 'uuid' imported but 
+unused
+flake8_report.txt:776:backend/api\serve
+r.py:17:1: F401 'pathlib.Path' 
+imported but unused
+flake8_report.txt:777:backend/api\serve
+r.py:18:1: F401 'typing.Optional' 
+imported but unused
+flake8_report.txt:779:backend/api\serve
+r.py:28:1: F401 'fastapi.File' 
+imported but unused
+flake8_report.txt:780:backend/api\serve
+r.py:28:1: F401 'fastapi.Form' 
+imported but unused
+flake8_report.txt:781:backend/api\serve
+r.py:28:1: F401 'fastapi.UploadFile' 
+imported but unused
+flake8_report.txt:782:backend/api\serve
+r.py:28:1: E402 module level import 
+not at top of file
+flake8_report.txt:783:backend/api\serve
+r.py:29:1: E402 module level import 
+not at top of file
+flake8_report.txt:784:backend/api\serve
+r.py:31:1: F401 
+'config.settings.api_config' imported 
+but unused
+flake8_report.txt:785:backend/api\serve
+r.py:31:1: F401 
+'config.settings.model_config' 
+imported but unused
+flake8_report.txt:786:backend/api\serve
+r.py:31:1: F401 
+'config.settings.UPLOADS_DIR' imported 
+but unused
+flake8_report.txt:787:backend/api\serve
+r.py:31:1: E402 module level import 
+not at top of file
+flake8_report.txt:788:backend/api\serve
+r.py:34:1: F401 
+'api.models.VisionRequest' imported 
+but unused
+flake8_report.txt:789:backend/api\serve
+r.py:34:1: F401 
+'api.models.VisionResponse' imported 
+but unused
+flake8_report.txt:790:backend/api\serve
+r.py:34:1: E402 module level import 
+not at top of file
+flake8_report.txt:791:backend/api\serve
+r.py:78:1: E305 expected 2 blank lines 
+after class or function definition, 
+found 1
+flake8_report.txt:798:backend/api\serve
+r.py:184:1: E302 expected 2 blank 
+lines, found 3
+flake8_report.txt:802:backend/api\serve
+r.py:367:1: W391 blank line at end of 
+file
+flake8_report.txt:803:backend/brain\__i
+nit__.py:2:1: F401 
+'.memory.MemoryManager' imported but 
+unused
+flake8_report.txt:804:backend/brain\__i
+nit__.py:3:1: F401 
+'.hypothesis.HypothesisEngine' 
+imported but unused
+flake8_report.txt:805:backend/brain\__i
+nit__.py:4:1: F401 
+'.verifier.VerifierStack' imported but 
+unused
+flake8_report.txt:806:backend/brain\__i
+nit__.py:5:1: F401 
+'.risk_manager.RiskManager' imported 
+but unused
+flake8_report.txt:807:backend/brain\__i
+nit__.py:6:1: F401 
+'.thinking_loop.ThinkingLoop' imported 
+but unused
+flake8_report.txt:808:backend/brain\adv
+anced_reasoning.py:18:1: F401 
+'typing.Callable' imported but unused
+flake8_report.txt:809:backend/brain\adv
+anced_reasoning.py:18:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:810:backend/brain\adv
+anced_reasoning.py:18:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:818:backend/brain\aes
+ce.py:10:1: F401 'time' imported but 
+unused
+flake8_report.txt:819:backend/brain\aes
+ce.py:12:1: F401 'os' imported but 
+unused
+flake8_report.txt:820:backend/brain\aes
+ce.py:15:1: F401 'copy.deepcopy' 
+imported but unused
+flake8_report.txt:821:backend/brain\aes
+ce.py:20:1: F401 'agents.profiles.devop
+s_reviewer.DevOpsReviewer' imported 
+but unused
+flake8_report.txt:822:backend/brain\aes
+ce.py:21:1: F401 
+'agents.controller.AgentController' 
+imported but unused
+flake8_report.txt:824:backend/brain\aes
+ce.py:25:1: E302 expected 2 blank 
+lines, found 1
+flake8_report.txt:856:backend/brain\aes
+ce.py:129:24: F541 f-string is missing 
+placeholders
+flake8_report.txt:859:backend/brain\cod
+e_analyzer.py:16:1: F401 'typing.Dict' 
+imported but unused
+flake8_report.txt:860:backend/brain\cod
+e_analyzer.py:16:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:861:backend/brain\cod
+e_analyzer.py:16:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:863:backend/brain\cod
+e_analyzer.py:189:40: E741 ambiguous 
+variable name 'l'
+flake8_report.txt:864:backend/brain\cod
+e_analyzer.py:190:42: E741 ambiguous 
+variable name 'l'
+flake8_report.txt:866:backend/brain\cod
+e_analyzer.py:222:40: E741 ambiguous 
+variable name 'l'
+flake8_report.txt:870:backend/brain\cod
+e_analyzer.py:545:30: E741 ambiguous 
+variable name 'l'
+flake8_report.txt:873:backend/brain\cod
+e_analyzer.py:588:38: E741 ambiguous 
+variable name 'l'
+flake8_report.txt:876:backend/brain\con
+tent_factory.py:8:1: F401 'os' 
+imported but unused
+flake8_report.txt:877:backend/brain\con
+tent_factory.py:11:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:878:backend/brain\con
+tent_factory.py:11:1: F401 
+'typing.Any' imported but unused
+flake8_report.txt:879:backend/brain\con
+tent_factory.py:13:1: F401 'core.model_
+providers.GenerationResult' imported 
+but unused
+flake8_report.txt:883:backend/brain\con
+tent_factory.py:35:1: E302 expected 2 
+blank lines, found 1
+flake8_report.txt:908:backend/brain\cre
+dit_assignment.py:13:1: F401 
+'typing.Any' imported but unused
+flake8_report.txt:909:backend/brain\cre
+dit_assignment.py:13:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:910:backend/brain\cre
+dit_assignment.py:13:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:911:backend/brain\cre
+dit_assignment.py:15:1: F401 
+'brain.trace_store.TraceSpan' imported 
+but unused
+flake8_report.txt:912:backend/brain\epi
+stemic_checker.py:13:1: E302 expected 
+2 blank lines, found 1
+flake8_report.txt:924:backend/brain\evo
+lution.py:11:1: F401 'ast' imported 
+but unused
+flake8_report.txt:925:backend/brain\evo
+lution.py:12:1: F401 'inspect' 
+imported but unused
+flake8_report.txt:926:backend/brain\evo
+lution.py:14:1: F401 'typing.Any' 
+imported but unused
+flake8_report.txt:927:backend/brain\evo
+lution.py:14:1: F401 'typing.Dict' 
+imported but unused
+flake8_report.txt:928:backend/brain\evo
+lution.py:23:1: F401 'agents.sandbox.en
+vironment.SandboxEnv' imported but 
+unused
+flake8_report.txt:929:backend/brain\evo
+lution.py:24:1: F401 
+'brain.thinking_loop.ThinkingLoop' 
+imported but unused
+flake8_report.txt:980:backend/brain\hyp
+othesis.py:16:1: F401 'typing.Any' 
+imported but unused
+flake8_report.txt:982:backend/brain\hyp
+othesis.py:98:13: F541 f-string is 
+missing placeholders
+flake8_report.txt:985:backend/brain\hyp
+othesis.py:201:13: F541 f-string is 
+missing placeholders
+flake8_report.txt:989:backend/brain\mem
+ory.py:25:1: F401 
+'config.settings.MEMORY_DIR' imported 
+but unused
+flake8_report.txt:999:backend/brain\met
+acognition.py:15:1: F401 'typing.Dict' 
+imported but unused
+flake8_report.txt:1000:backend/brain\pr
+oblem_classifier.py:11:1: F401 're' 
+imported but unused
+flake8_report.txt:1001:backend/brain\pr
+oblem_classifier.py:14:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1010:backend/brain\pr
+ompt_evolver.py:13:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1011:backend/brain\pr
+ompt_evolver.py:13:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:1013:backend/brain\re
+asoning.py:10:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1014:backend/brain\re
+ward_model.py:12:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1015:backend/brain\re
+ward_model.py:12:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:1019:backend/brain\re
+ward_model.py:113:28: E128 
+continuation line under-indented for 
+visual indent
+flake8_report.txt:1021:backend/brain\ri
+sk_manager.py:11:1: F401 'math' 
+imported but unused
+flake8_report.txt:1022:backend/brain\ri
+sk_manager.py:14:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1027:backend/brain\se
+lf_mutator.py:9:1: F401 'os' imported 
+but unused
+flake8_report.txt:1028:backend/brain\se
+lf_mutator.py:12:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1029:backend/brain\se
+lf_mutator.py:17:1: E302 expected 2 
+blank lines, found 1
+flake8_report.txt:1048:backend/brain\so
+lver\complexity.py:19:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1050:backend/brain\so
+lver\complexity.py:55:26: F541 
+f-string is missing placeholders
+flake8_report.txt:1053:backend/brain\so
+lver\complexity.py:166:9: F841 local 
+variable 'code_lower' is assigned to 
+but never used
+flake8_report.txt:1055:backend/brain\so
+lver\complexity.py:198:9: F841 local 
+variable 'code_lower' is assigned to 
+but never used
+flake8_report.txt:1060:backend/brain\so
+lver\engine.py:20:1: F401 'traceback' 
+imported but unused
+flake8_report.txt:1061:backend/brain\so
+lver\engine.py:23:1: F401 'typing.Any' 
+imported but unused
+flake8_report.txt:1062:backend/brain\so
+lver\engine.py:23:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1063:backend/brain\so
+lver\engine.py:23:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:1082:backend/brain\so
+lver\engine.py:603:17: E128 
+continuation line under-indented for 
+visual indent
+flake8_report.txt:1090:backend/brain\so
+lver\evolver.py:17:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:1091:backend/brain\so
+lver\evolver.py:17:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1094:backend/brain\so
+lver\evolver.py:325:34: E741 ambiguous 
+variable name 'l'
+flake8_report.txt:1095:backend/brain\so
+lver\healer.py:16:1: F401 'traceback' 
+imported but unused
+flake8_report.txt:1096:backend/brain\so
+lver\healer.py:18:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1097:backend/brain\so
+lver\healer.py:18:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:1099:backend/brain\so
+lver\healer.py:179:21: F541 f-string 
+is missing placeholders
+flake8_report.txt:1101:backend/brain\so
+lver\healer.py:202:21: F541 f-string 
+is missing placeholders
+flake8_report.txt:1107:backend/brain\so
+lver\healer.py:328:17: E131 
+continuation line unaligned for 
+hanging indent
+flake8_report.txt:1108:backend/brain\so
+lver\patterns.py:19:1: F401 
+'pathlib.Path' imported but unused
+flake8_report.txt:1110:backend/brain\so
+lver\test_gen.py:15:1: F401 
+'traceback' imported but unused
+flake8_report.txt:1111:backend/brain\so
+lver\test_gen.py:17:1: F401 
+'typing.Any' imported but unused
+flake8_report.txt:1112:backend/brain\so
+lver\test_gen.py:17:1: F401 
+'typing.Tuple' imported but unused
+flake8_report.txt:1115:backend/brain\th
+inking_loop.py:10:1: F401 'typing.Any' 
+imported but unused
+flake8_report.txt:1116:backend/brain\th
+inking_loop.py:10:1: F401 
+'typing.Dict' imported but unused
+flake8_report.txt:1117:backend/brain\th
+inking_loop.py:23:1: F401 
+'brain.trace_store.TraceSpan' imported 
+but unused
+flake8_report.txt:1118:backend/brain\th
+inking_loop.py:26:1: F401 
+'brain.reward_model.CompositeReward' 
+imported but unused
+flake8_report.txt:1119:backend/brain\th
+inking_loop.py:27:1: F401 
+'brain.credit_assignment.CreditReport' 
+imported but unused
+flake8_report.txt:1160:backend/brain\tr
+ace_store.py:12:1: F401 'os' imported 
+but unused
+flake8_report.txt:1165:backend/brain\tr
+anspiler.py:11:1: F401 'typing.Dict' 
+imported but unused
+flake8_report.txt:1192:backend/brain\ve
+rifier.py:245:39: F541 f-string is 
+missing placeholders
+flake8_report.txt:1193:backend/brain\ve
+rifier.py:247:39: F541 f-string is 
+missing placeholders
+flake8_report.txt:1195:backend/brain\ve
+rifier.py:308:17: F541 f-string is 
+missing placeholders
+flake8_report.txt:1201:backend/config\s
+ettings.py:7:1: F401 'torch' imported 
+but unused
+flake8_report.txt:1202:backend/config\s
+ettings.py:10:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1207:backend/config\s
+ettings.py:153:1: W391 blank line at 
+end of file
+flake8_report.txt:1208:backend/core\mod
+el_providers.py:21:1: F401 
+'dataclasses.field' imported but unused
+flake8_report.txt:1213:backend/core\mod
+el_providers.py:469:1: E302 expected 2 
+blank lines, found 4
+flake8_report.txt:1218:backend/core\mod
+el_router.py:14:1: F401 
+'dataclasses.field' imported but unused
+flake8_report.txt:1219:backend/core\mod
+el_router.py:16:1: F401 
+'typing.Optional' imported but unused
+flake8_report.txt:1223:backend/core\str
+eaming.py:17:1: F401 
+'typing.AsyncGenerator' imported but 
+unused
+flake8_report.txt:1224:backend/core\str
+eaming.py:17:1: F401 
+'typing.Generator' imported but unused
+flake8_report.txt:1231:backend/main.py:
+165:11: F541 f-string is missing 
+placeholders
+flake8_report.txt:1232:backend/main.py:
+166:11: F541 f-string is missing 
+placeholders
+flake8_report.txt:1233:backend/main.py:
+167:11: F541 f-string is missing 
+placeholders
+flake8_report.txt:1234:backend/main.py:
+168:11: F541 f-string is missing 
+placeholders
+flake8_report.txt:1235:backend/main.py:
+169:11: F541 f-string is missing 
+placeholders
+flake8_report.txt:1236:backend/main.py:
+170:11: F541 f-string is missing 
+placeholders
+flake8_report.txt:1237:backend/main.py:
+171:11: F541 f-string is missing 
+placeholders
+flake8_report.txt:1241:backend/main.py:
+280:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1246:backend/main.py:
+304:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1263:backend/main.py:
+379:27: E701 multiple statements on 
+one line (colon)
+flake8_report.txt:1264:backend/main.py:
+386:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1266:backend/main.py:
+391:27: E701 multiple statements on 
+one line (colon)
+flake8_report.txt:1267:backend/main.py:
+396:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1269:backend/main.py:
+401:27: E701 multiple statements on 
+one line (colon)
+flake8_report.txt:1270:backend/main.py:
+406:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1272:backend/main.py:
+411:27: E701 multiple statements on 
+one line (colon)
+flake8_report.txt:1273:backend/main.py:
+416:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1275:backend/main.py:
+421:27: E701 multiple statements on 
+one line (colon)
+flake8_report.txt:1277:backend/main.py:
+431:27: E701 multiple statements on 
+one line (colon)
+flake8_report.txt:1288:backend/main.py:
+478:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1290:backend/main.py:
+481:16: F821 undefined name 
+'ProviderRegistry'
+flake8_report.txt:1291:backend/main.py:
+484:9: F821 undefined name 'os'
+flake8_report.txt:1295:backend/main.py:
+497:1: E302 expected 2 blank lines, 
+found 1
+flake8_report.txt:1320:backend/test_exp
+ert_domains.py:1:1: F401 'sys' 
+imported but unused
+flake8_report.txt:1321:backend/test_exp
+ert_domains.py:3:1: F401 'core.model_pr
+oviders.ProviderRegistry' imported but 
+unused
+flake8_report.txt:1322:backend/test_exp
+ert_domains.py:8:1: E302 expected 2 
+blank lines, found 1
+flake8_report.txt:1343:backend/test_exp
+ert_domains.py:67:1: E305 expected 2 
+blank lines after class or function 
+definition, found 1
+flake8_report.txt:1344:backend/test_ref
+lection.py:12:1: E302 expected 2 blank 
+lines, found 1
+flake8_report.txt:1345:backend/test_ref
+lection.py:15:5: F841 local variable 
+'agent' is assigned to but never used
+flake8_report.txt:1351:backend/test_ref
+lection.py:31:1: E305 expected 2 blank 
+lines after class or function 
+definition, found 1
+flake8_report.txt:1352:backend/tests\te
+st_aesce.py:7:1: E402 module level 
+import not at top of file
+flake8_report.txt:1353:backend/tests\te
+st_aesce.py:8:1: F401 
+'brain.self_mutator.SelfMutator' 
+imported but unused
+flake8_report.txt:1354:backend/tests\te
+st_aesce.py:8:1: E402 module level 
+import not at top of file
+flake8_report.txt:1355:backend/tests\te
+st_aesce.py:9:1: E402 module level 
+import not at top of file
+flake8_report.txt:1356:backend/tests\te
+st_aesce.py:10:1: F401 
+'brain.memory.FailureTuple' imported 
+but unused
+flake8_report.txt:1357:backend/tests\te
+st_aesce.py:10:1: E402 module level 
+import not at top of file
+flake8_report.txt:1358:backend/tests\te
+st_aesce.py:12:1: E302 expected 2 
+blank lines, found 1
+flake8_report.txt:1361:backend/tests\te
+st_aesce.py:23:1: E302 expected 2 
+blank lines, found 1
+flake8_report.txt:1364:backend/tests\te
+st_aesce.py:34:1: E302 expected 2 
+blank lines, found 1
+flake8_report.txt:1365:backend/tests\te
+st_aesce.py:36:5: E306 expected 1 
+blank line before a nested definition, 
+found 0
+flake8_report.txt:1373:backend/tests\te
+st_import.py:6:5: F401 'brain.aesce.Syn
+thesizedConsciousnessEngine' imported 
+but unused
+flake8_report.txt:1374:backend/tests\te
+st_new_profiles.py:2:1: F401 'os' 
+imported but unused
+flake8_report.txt:1375:backend/tests\te
+st_new_profiles.py:8:1: E402 module 
+level import not at top of file
+flake8_report.txt:1376:backend/tests\te
+st_new_profiles.py:9:1: E402 module 
+level import not at top of file
+flake8_report.txt:1377:backend/tests\te
+st_new_profiles.py:10:1: E402 module 
+level import not at top of file
+flake8_report.txt:1378:backend/tests\te
+st_new_profiles.py:12:1: E302 expected 
+2 blank lines, found 1
+flake8_report.txt:1379:backend/tests\te
+st_new_profiles.py:14:5: E306 expected 
+1 blank line before a nested 
+definition, found 0
+flake8_report.txt:1381:backend/tests\te
+st_new_profiles.py:22:1: E302 expected 
+2 blank lines, found 1
+flake8_report.txt:1382:backend/tests\te
+st_new_profiles.py:24:5: E306 expected 
+1 blank line before a nested 
+definition, found 0
+flake8_report.txt:1384:backend/tests\te
+st_new_profiles.py:32:1: E305 expected 
+2 blank lines after class or function 
+definition, found 1
+flake8_report.txt:1391:backend/tests\te
+st_safety.py:4:1: F401 'types' 
+imported but unused
+flake8_report.txt:1393:backend/tests\te
+st_safety.py:55:5: F401 'agents.safety.
+content_filter.SafetyAction' imported 
+but unused
+flake8_report.txt:1396:backend/tests\te
+st_safety.py:89:5: F401 'agents.safety.
+content_filter.SafetyAction' imported 
+but unused
+flake8_report.txt:1403:backend/tests\te
+st_safety.py:200:5: F401 
+'agents.safety.ethics.EthicsAction' 
+imported but unused
+flake8_report.txt:1406:backend/tests\te
+st_safety.py:286:44: F541 f-string is 
+missing placeholders
+flake8_report.txt:1412:backend/tests\te
+st_solver.py:31:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1413:backend/tests\te
+st_solver.py:35:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1415:backend/tests\te
+st_solver.py:39:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1416:backend/tests\te
+st_solver.py:57:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1422:backend/tests\te
+st_solver.py:180:5: F401 
+'brain.solver.healer.CodeError' 
+imported but unused
+flake8_report.txt:1423:backend/tests\te
+st_solver.py:202:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1426:backend/tests\te
+st_solver.py:226:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1433:backend/tests\te
+st_solver.py:337:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1434:backend/tests\te
+st_solver.py:407:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1436:backend/tests\te
+st_solver.py:414:11: F541 f-string is 
+missing placeholders
+flake8_report.txt:1438:backend/tests\te
+st_solver.py:456:29: F541 f-string is 
+missing placeholders
+flake8_report.txt:1475:backend/tests\te
+st_universal_enhancements.py:2:1: F401 
+'os' imported but unused
+flake8_report.txt:1476:backend/tests\te
+st_universal_enhancements.py:8:1: E402 
+module level import not at top of file
+flake8_report.txt:1477:backend/tests\te
+st_universal_enhancements.py:9:1: F401 
+'agents.experts.router.DomainRouter' 
+imported but unused
+flake8_report.txt:1478:backend/tests\te
+st_universal_enhancements.py:9:1: E402 
+module level import not at top of file
+flake8_report.txt:1479:backend/tests\te
+st_universal_enhancements.py:10:1: 
+F401 'brain.reasoning.ReasoningTrace' 
+imported but unused
+flake8_report.txt:1480:backend/tests\te
+st_universal_enhancements.py:10:1: 
+E402 module level import not at top of 
+file
+flake8_report.txt:1481:backend/tests\te
+st_universal_enhancements.py:11:1: 
+F401 
+'brain.thinking_loop.ThinkingResult' 
+imported but unused
+flake8_report.txt:1482:backend/tests\te
+st_universal_enhancements.py:11:1: 
+F401 
+'brain.thinking_loop.ThinkingStep' 
+imported but unused
+flake8_report.txt:1483:backend/tests\te
+st_universal_enhancements.py:11:1: 
+E402 module level import not at top of 
+file
+flake8_report.txt:1484:backend/tests\te
+st_universal_enhancements.py:12:1: 
+E402 module level import not at top of 
+file
+flake8_report.txt:1485:backend/tests\te
+st_universal_enhancements.py:13:1: 
+F401 'core.model_providers.GenerationRe
+sult' imported but unused
+flake8_report.txt:1486:backend/tests\te
+st_universal_enhancements.py:13:1: 
+E402 module level import not at top of 
+file
+flake8_report.txt:1487:backend/tests\te
+st_universal_enhancements.py:15:1: 
+E302 expected 2 blank lines, found 1
+flake8_report.txt:1488:backend/tests\te
+st_universal_enhancements.py:17:5: 
+E306 expected 1 blank line before a 
+nested definition, found 0
+flake8_report.txt:1490:backend/tests\te
+st_universal_enhancements.py:28:1: 
+E302 expected 2 blank lines, found 1
+flake8_report.txt:1491:backend/tests\te
+st_universal_enhancements.py:30:5: 
+E306 expected 1 blank line before a 
+nested definition, found 0
+flake8_report.txt:1493:backend/tests\te
+st_universal_enhancements.py:38:1: 
+E305 expected 2 blank lines after 
+class or function definition, found 1
+flake8_report.txt:1494:backend/tests\tr
+ace_me.py:6:5: F401 'brain.aesce.Synthe
+sizedConsciousnessEngine' imported but 
+unused
+flake8_report.txt:1495:backend/tests\tr
+ace_me.py:7:1: F841 local variable 'e' 
+is assigned to but never used
+
+

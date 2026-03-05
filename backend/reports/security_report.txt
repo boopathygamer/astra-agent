@@ -1,0 +1,171 @@
+Run started:2026-02-21 02:06:26.464562+00:00
+
+Test results:
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\agents\proactive\swarm_defense.py:14:0
+13	import threading
+14	import subprocess
+15	from pathlib import Path
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: .\agents\proactive\swarm_defense.py:37:28
+36	        try:
+37	            self.sock.bind(("0.0.0.0", self.port))
+38	            self.sock.listen(5)
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b110_try_except_pass.html
+   Location: .\agents\proactive\swarm_defense.py:76:12
+75	                conn.close()
+76	            except:
+77	                pass
+78	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b110_try_except_pass.html
+   Location: .\agents\proactive\swarm_defense.py:129:8
+128	                self.filepath.unlink()
+129	        except:
+130	            pass
+131	
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\agents\process_manager.py:16:0
+15	import shlex
+16	import subprocess
+17	import sys
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\agents\process_manager.py:167:19
+166	                cmd_args,
+167	                shell=False,    # FIXED: was shell=True (shell injection)
+168	                stdin=subprocess.PIPE,   # FIXED: was missing (write() crashed)
+169	                stdout=subprocess.PIPE,
+170	                stderr=subprocess.PIPE,
+171	                text=True,
+172	                cwd=cwd,
+173	                bufsize=1,
+174	            )
+175	        except Exception as e:
+176	            return {"status": "error", "message": f"Failed to start process: {type(e).__name__}"}
+177	
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b110_try_except_pass.html
+   Location: .\agents\process_manager.py:248:16
+247	                    managed.error_lines = stderr.splitlines() if stderr else []
+248	                except Exception:
+249	                    pass
+250	            except Exception as e:
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\agents\tools\code_executor.py:8:0
+7	import logging
+8	import subprocess
+9	import sys
+
+--------------------------------------------------
+>> Issue: [B603:subprocess_without_shell_equals_true] subprocess call - check for execution of untrusted input.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b603_subprocess_without_shell_equals_true.html
+   Location: .\agents\tools\code_executor.py:130:17
+129	    try:
+130	        result = subprocess.run(
+131	            [sys.executable, temp_path],
+132	            capture_output=True,
+133	            text=True,
+134	            timeout=timeout,
+135	            cwd=tempfile.gettempdir(),
+136	        )
+137	
+
+--------------------------------------------------
+>> Issue: [B404:blacklist] Consider possible security implications associated with the subprocess module.
+   Severity: Low   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/blacklists/blacklist_imports.html#b404-import-subprocess
+   Location: .\agents\tools\registry.py:7:0
+6	import logging
+7	import subprocess
+8	import asyncio
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b110_try_except_pass.html
+   Location: .\brain\problem_classifier.py:237:8
+236	                    return d
+237	        except Exception:
+238	            pass
+239	        return ProblemDomain.GENERAL
+
+--------------------------------------------------
+>> Issue: [B110:try_except_pass] Try, Except, Pass detected.
+   Severity: Low   Confidence: High
+   CWE: CWE-703 (https://cwe.mitre.org/data/definitions/703.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b110_try_except_pass.html
+   Location: .\brain\reasoning.py:275:8
+274	                    return m
+275	        except Exception:
+276	            pass
+277	        return CognitiveMode.DECOMPOSE
+
+--------------------------------------------------
+>> Issue: [B105:hardcoded_password_string] Possible hardcoded password: 'token'
+   Severity: Low   Confidence: Medium
+   CWE: CWE-259 (https://cwe.mitre.org/data/definitions/259.html)
+   More Info: https://bandit.readthedocs.io/en/1.9.3/plugins/b105_hardcoded_password_string.html
+   Location: .\core\streaming.py:24:12
+23	    """Types of streaming events."""
+24	    TOKEN = "token"        # Single generated token
+25	    TEXT_CHUNK = "chunk"   # Coalesced text chunk
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 16017
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 6
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 12
+		Medium: 1
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 2
+		High: 11
+Files skipped (0):

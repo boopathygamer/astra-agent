@@ -1,0 +1,3 @@
+{"role": "system", "content": "Session created: type=spawned, label=task_ce857f", "timestamp": "2026-02-27T12:19:39.794342+00:00", "metadata": {"event": "session_created"}}
+{"role": "user", "content": "Process this data", "timestamp": "2026-02-27T12:19:39.794342+00:00", "metadata": {"event": "task_spawned", "parent": "0733fcaa-5b8"}}
+{"role": "assistant", "content": "Processed by child: Process this data", "timestamp": "2026-02-27T12:19:39.795630+00:00", "metadata": {"event": "task_completed"}}

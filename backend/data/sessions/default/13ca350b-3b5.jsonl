@@ -1,0 +1,2 @@
+{"role": "system", "content": "Session created: type=spawned, label=task_9b49ae", "timestamp": "2026-02-27T12:19:39.777161+00:00", "metadata": {"event": "session_created"}}
+{"role": "user", "content": "Task 1", "timestamp": "2026-02-27T12:19:39.777161+00:00", "metadata": {"event": "task_spawned", "parent": "622199ea-63b"}}
