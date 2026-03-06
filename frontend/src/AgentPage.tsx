@@ -4,12 +4,13 @@ import {
   ArrowLeft, Activity, Cpu, Shield, Zap, Database, Network, Terminal,
   RefreshCcw, Circle, ChevronDown, ChevronUp, Wifi, WifiOff, BrainCircuit,
   Wrench, MessageSquare, GitBranch, ArrowRight, ArrowLeftRight, Bot,
-  HardDrive, Clock, Gauge, AlertTriangle, CheckCircle2, XCircle, Loader2
+  HardDrive, Clock, Gauge, AlertTriangle, CheckCircle2, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   checkHealth, getProviderStatus, getAgentStats, getProcesses,
   getSessions, getMemoryStats, getLongTermMemory, getDeviceList,
+  getOrchestratorStatus,
   type HealthStatus
 } from './api';
 
@@ -86,6 +87,10 @@ export default function AgentPage() {
   const [filterType, setFilterType] = useState<string>('all');
   const logEndRef = useRef<HTMLDivElement>(null);
 
+  // Orchestrator state (read-only)
+  const [orchStatus, setOrchStatus] = useState<any>(null);
+  const [isOrchModalOpen, setOrchModalOpen] = useState(false);
+
   const addLog = useCallback((log: Omit<ActivityLog, 'id' | 'timestamp'>) => {
     setActivityLog(prev => {
       const newLog: ActivityLog = {
@@ -96,6 +101,7 @@ export default function AgentPage() {
       return [newLog, ...prev].slice(0, 200); // Keep last 200 entries
     });
   }, []);
+
 
   const fetchAllData = useCallback(async () => {
     setIsRefreshing(true);
@@ -197,6 +203,15 @@ export default function AgentPage() {
       }
     } catch {
       setDevices(null);
+    }
+
+    // Orchestrator Status
+    try {
+      const os = await getOrchestratorStatus();
+      setOrchStatus(os);
+      addLog({ type: 'agent', source: 'Orchestrator', action: `Strategies: [${os.available_strategies?.join(', ')}] | Agent: ${os.agent_initialized ? 'READY' : 'OFF'}`, status: os.agent_initialized ? 'success' : 'pending' });
+    } catch {
+      setOrchStatus(null);
     }
 
     // System communication events
@@ -383,6 +398,38 @@ export default function AgentPage() {
             </div>
           </div>
 
+          {/* Multi-Agent Orchestrator */}
+          <div className="p-4 border-b border-white/5">
+            <div className="flex items-center gap-2 mb-3">
+              <GitBranch className="w-3.5 h-3.5 text-violet-400" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/40">Orchestrator</span>
+              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${orchStatus?.agent_initialized
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
+                : 'bg-white/5 text-white/20 border-white/10'
+                }`}>{orchStatus?.agent_initialized ? 'READY' : 'OFF'}</span>
+            </div>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                {['debate', 'swarm', 'pipeline', 'hierarchy'].map((s) => (
+                  <div key={s} className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${orchStatus?.available_strategies?.includes(s)
+                      ? 'bg-violet-400 shadow-[0_0_4px_rgba(139,92,246,0.5)]'
+                      : 'bg-white/10'
+                      }`} />
+                    <span className="text-[10px] font-mono text-white/40 uppercase">{s}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setOrchModalOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 text-violet-400 text-xs font-bold transition-colors"
+              >
+                <Zap className="w-3 h-3" />
+                View Details
+              </button>
+            </div>
+          </div>
+
           {/* Devices */}
           <div className="p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -421,8 +468,8 @@ export default function AgentPage() {
                   key={f}
                   onClick={() => setFilterType(f)}
                   className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${filterType === f
-                      ? 'bg-white/10 text-white'
-                      : 'text-white/25 hover:text-white/50 hover:bg-white/5'
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/25 hover:text-white/50 hover:bg-white/5'
                     }`}
                 >
                   {f}
@@ -503,6 +550,181 @@ export default function AgentPage() {
           </div>
         </div>
       </div>
+
+      {/* Orchestrator Modal */}
+      <AnimatePresence>
+        {isOrchModalOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOrchModalOpen(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl bg-[#0c0c0c] border border-violet-500/20 rounded-2xl shadow-[0_0_60px_rgba(139,92,246,0.08)] z-50 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-violet-500/10 bg-gradient-to-r from-violet-500/5 to-transparent">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
+                    <GitBranch className="w-5 h-5 text-violet-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      Multi-Agent Orchestrator <span className="text-[10px] font-mono bg-violet-500/20 text-violet-400 px-2 py-0.5 rounded border border-violet-500/20">SYSTEM</span>
+                    </h2>
+                    <p className="text-[11px] text-white/30 font-mono">AGENTS · STRATEGIES · TOOLS · SAFETY</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setOrchModalOpen(false)}
+                  className="p-2 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                >
+                  <XCircle className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Read-Only Dashboard Content */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar px-6 py-5 space-y-6">
+
+                {/* ── Agents ── */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Bot className="w-4 h-4 text-violet-400" />
+                    <span className="text-xs font-bold uppercase tracking-[0.15em] text-white/50">Available Agents</span>
+                    <span className="text-[10px] font-mono text-white/20 ml-auto">10 agents</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { name: 'Solution Expert', icon: '🧠', desc: 'Drafts initial solutions', color: 'violet' },
+                      { name: 'Ruthless Critic', icon: '🔍', desc: 'Reviews for flaws & vulns', color: 'red' },
+                      { name: 'Chief Architect', icon: '🏗️', desc: 'Synthesizes final output', color: 'cyan' },
+                      { name: 'Deep Researcher', icon: '🌐', desc: 'Multi-hop web intelligence', color: 'emerald' },
+                      { name: 'Threat Hunter', icon: '🕵️', desc: 'Security audit & analysis', color: 'red' },
+                      { name: 'DevOps Reviewer', icon: '🛠️', desc: 'Autonomous issue fixing', color: 'amber' },
+                      { name: 'Contract Hunter', icon: '📜', desc: 'Toxic clause detection', color: 'pink' },
+                      { name: 'Devil\'s Advocate', icon: '👔', desc: 'Risk matrix analysis', color: 'orange' },
+                      { name: 'Swarm Intelligence', icon: '🐝', desc: 'Multi-agent swarm tasks', color: 'yellow' },
+                      { name: 'Ultimate Tutor', icon: '🎓', desc: 'Socratic teaching engine', color: 'blue' },
+                    ].map((agent) => (
+                      <div key={agent.name} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/5 hover:border-white/10 transition-colors">
+                        <span className="text-lg flex-shrink-0">{agent.icon}</span>
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-bold text-white/70 truncate">{agent.name}</div>
+                          <div className="text-[10px] text-white/25 truncate">{agent.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Strategies ── */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <GitBranch className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-bold uppercase tracking-[0.15em] text-white/50">Orchestration Strategies</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: 'debate', icon: '🤝', label: 'Debate', desc: 'Expert → Critic → Synthesis' },
+                      { key: 'swarm', icon: '🐝', label: 'Swarm', desc: 'Parallel multi-agent swarm' },
+                      { key: 'pipeline', icon: '⛓️', label: 'Pipeline', desc: 'Sequential stage pipeline' },
+                      { key: 'hierarchy', icon: '🏗️', label: 'Hierarchy', desc: 'Manager → Worker delegation' },
+                    ].map(({ key, icon, label, desc }) => {
+                      const isAvailable = orchStatus?.available_strategies?.includes(key);
+                      return (
+                        <div key={key} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/5">
+                          <span className="text-lg flex-shrink-0">{icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-bold text-white/70">{label}</div>
+                            <div className="text-[10px] text-white/25">{desc}</div>
+                          </div>
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isAvailable ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]' : 'bg-white/10'}`} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── Tools ── */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Wrench className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold uppercase tracking-[0.15em] text-white/50">System Tools</span>
+                    <span className="text-[10px] font-mono text-white/20 ml-auto">{health?.tools_available || 0} registered</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { name: 'Code Evolution', icon: '🧬' },
+                      { name: 'Threat Scanner', icon: '🛡️' },
+                      { name: 'Memory Recall', icon: '🧠' },
+                      { name: 'File Operations', icon: '📁' },
+                      { name: 'Web Search', icon: '🔎' },
+                      { name: 'Device Control', icon: '💻' },
+                    ].map((tool) => (
+                      <div key={tool.name} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-white/[0.03] border border-white/5">
+                        <span className="text-sm">{tool.icon}</span>
+                        <span className="text-[10px] font-medium text-white/40">{tool.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── System Safety ── */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Shield className="w-4 h-4 text-red-400" />
+                    <span className="text-xs font-bold uppercase tracking-[0.15em] text-white/50">Safety & Limits</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white/[0.03] rounded-lg p-3 border border-white/5 text-center">
+                      <div className="text-[9px] text-white/25 mb-1">Max Depth</div>
+                      <div className="text-sm font-bold text-violet-400">3</div>
+                    </div>
+                    <div className="bg-white/[0.03] rounded-lg p-3 border border-white/5 text-center">
+                      <div className="text-[9px] text-white/25 mb-1">Max Agents</div>
+                      <div className="text-sm font-bold text-amber-400">8</div>
+                    </div>
+                    <div className="bg-white/[0.03] rounded-lg p-3 border border-white/5 text-center">
+                      <div className="text-[9px] text-white/25 mb-1">Timeout</div>
+                      <div className="text-sm font-bold text-cyan-400">10m</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/50" />
+                    <span className="text-[10px] text-white/30">Circuit breaker active — all agents Justice Court-reviewed via AgentForge</span>
+                  </div>
+                </div>
+
+                {/* ── Agent Roles ── */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Cpu className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-bold uppercase tracking-[0.15em] text-white/50">Agent Roles</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Architect', 'Coder', 'Reviewer', 'Researcher', 'Security', 'Analyst', 'Writer', 'Manager', 'Critic', 'Synthesizer'].map((role) => (
+                      <span key={role} className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-white/[0.04] border border-white/5 text-white/35">
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="h-8 border-t border-violet-500/10 bg-[#0a0a0a] flex items-center px-6 text-[9px] font-mono text-white/15">
+                <span>ASTRA MULTI-AGENT ORCHESTRATOR — READ-ONLY SYSTEM OVERVIEW</span>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

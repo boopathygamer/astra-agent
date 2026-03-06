@@ -32,6 +32,10 @@ class ChatResponse(BaseModel):
     thinking_steps: List[str] = []
     tools_used: List[str] = []
     duration_ms: float = 0.0
+    routed_to: Optional[str] = None
+    routing_confidence: Optional[float] = None
+    routing_display: Optional[str] = None
+    routing_emoji: Optional[str] = None
 
 
 # ──────────────────────────────────────────────

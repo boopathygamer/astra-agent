@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Send, Mic, Paperclip, Image as ImageIcon, Play, Code2, Smartphone, Download, Settings, Maximize2, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Send, Mic, Paperclip, Image as ImageIcon, Play, Code2, Smartphone, Download, Settings, Maximize2, RotateCcw, Upload } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import ProjectUploader from './ProjectUploader';
 
 export default function AppDevPage() {
   const [input, setInput] = useState('');
@@ -9,6 +10,7 @@ export default function AppDevPage() {
   const [messages, setMessages] = useState([
     { text: "I'm ready to help you build your mobile app. What kind of app are we creating today?", isUser: false }
   ]);
+  const [showUploader, setShowUploader] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +36,12 @@ export default function AppDevPage() {
             <span className="font-semibold text-sm tracking-tight">App Studio</span>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowUploader(true)} className="px-3 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-md transition-colors flex items-center gap-1.5">
+            <Upload className="w-3.5 h-3.5" />
+            Import
+          </button>
           <button className="px-3 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-md transition-colors flex items-center gap-1.5">
             <Download className="w-3.5 h-3.5" />
             Export
@@ -49,21 +55,20 @@ export default function AppDevPage() {
 
       {/* Main Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        
+
         {/* Left Pane: Assistant Chat */}
         <div className="w-[400px] border-r border-white/10 flex flex-col bg-[#0f0f0f] shrink-0">
           <div className="h-12 border-b border-white/5 flex items-center px-4 shrink-0">
             <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">AI Assistant</span>
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                  msg.isUser 
-                    ? 'bg-[#2f2f2f] text-white border border-white/5' 
+                <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${msg.isUser
+                    ? 'bg-[#2f2f2f] text-white border border-white/5'
                     : 'bg-transparent text-white/90'
-                }`}>
+                  }`}>
                   {!msg.isUser && (
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-5 h-5 rounded bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
@@ -97,8 +102,8 @@ export default function AppDevPage() {
                 <button type="button" className="p-1.5 text-white/40 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
                   <ImageIcon className="w-4 h-4" />
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className={`p-1.5 rounded-lg transition-colors ${input.trim() ? 'bg-white text-black' : 'bg-white/5 text-white/20'}`}
                   disabled={!input.trim()}
                 >
@@ -114,14 +119,14 @@ export default function AppDevPage() {
           {/* Workspace Tabs */}
           <div className="h-12 border-b border-white/10 flex items-center justify-between px-4 shrink-0 bg-[#141414]">
             <div className="flex items-center gap-1">
-              <button 
+              <button
                 onClick={() => setActiveTab('preview')}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${activeTab === 'preview' ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}`}
               >
                 <Smartphone className="w-4 h-4" />
                 Preview
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab('code')}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${activeTab === 'code' ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white hover:bg-white/5'}`}
               >
@@ -129,7 +134,7 @@ export default function AppDevPage() {
                 Code
               </button>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <button className="p-1.5 text-white/40 hover:text-white hover:bg-white/5 rounded-md transition-colors">
                 <RotateCcw className="w-4 h-4" />
@@ -144,7 +149,7 @@ export default function AppDevPage() {
           <div className="flex-1 relative overflow-hidden bg-[#0a0a0a]">
             <AnimatePresence mode="wait">
               {activeTab === 'preview' ? (
-                <motion.div 
+                <motion.div
                   key="preview"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -159,7 +164,7 @@ export default function AppDevPage() {
                       <div className="w-12 h-1 rounded-full bg-black/50" />
                       <div className="w-2 h-2 rounded-full bg-blue-900/50 border border-blue-500/20" />
                     </div>
-                    
+
                     {/* App Content Area */}
                     <div className="flex-1 bg-white mt-6 rounded-t-3xl overflow-hidden flex flex-col">
                       <div className="h-14 bg-blue-600 flex items-center justify-center text-white font-semibold shadow-sm">
@@ -172,7 +177,7 @@ export default function AppDevPage() {
                   </div>
                 </motion.div>
               ) : (
-                <motion.div 
+                <motion.div
                   key="code"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -228,6 +233,19 @@ export default function AppDevPage() {
           </div>
         </div>
       </div>
+
+      {/* Upload Modal */}
+      <ProjectUploader
+        mode="app"
+        isOpen={showUploader}
+        onClose={() => setShowUploader(false)}
+        onImport={(files, analysis) => {
+          setMessages(prev => [...prev, {
+            text: `📂 Imported project: ${analysis.summary}\n\nReady to continue development. What would you like to change?`,
+            isUser: false
+          }]);
+        }}
+      />
     </div>
   );
 }

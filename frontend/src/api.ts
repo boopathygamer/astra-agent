@@ -61,6 +61,10 @@ export interface ChatResponse {
     thinking_steps: string[];
     tools_used: string[];
     duration_ms: number;
+    routed_to?: string;
+    routing_confidence?: number;
+    routing_display?: string;
+    routing_emoji?: string;
 }
 
 export async function sendChat(
@@ -246,3 +250,62 @@ export async function quarantineFile(filePath: string): Promise<any> {
 export async function destroyThreat(filePath: string): Promise<any> {
     return apiFetch('/scan/destroy', { method: 'POST', body: { file_path: filePath } });
 }
+
+// ── Multi-Agent Orchestrator ────────────────────
+
+export interface OrchestrateResult {
+    strategy: string;
+    topic: string;
+    answer: string;
+    confidence: number;
+    mode?: string;
+    error?: string;
+    duration_ms: number;
+    sub_tasks?: number;
+    summary?: string;
+}
+
+export async function orchestrateDebate(topic: string, strategy: string = 'debate'): Promise<OrchestrateResult> {
+    return apiFetch<OrchestrateResult>('/orchestrate/debate', {
+        method: 'POST',
+        body: { topic, strategy },
+    });
+}
+
+export interface OrchestratorStatus {
+    available_strategies: string[];
+    agent_initialized: boolean;
+    routing_stats: any;
+}
+
+export async function getOrchestratorStatus(): Promise<OrchestratorStatus> {
+    return apiFetch<OrchestratorStatus>('/orchestrate/status');
+}
+
+// ── MCP (Model Context Protocol) ────────────────
+
+export async function getMcpConfig(client: string = 'claude'): Promise<any> {
+    return apiFetch(`/mcp/config?client=${encodeURIComponent(client)}`);
+}
+
+export interface McpTool {
+    name: string;
+    description: string;
+}
+
+export interface McpStatus {
+    project_root: string;
+    transports: string[];
+    stdio_command: string;
+    http_command: string;
+    http_url: string;
+    tools_count: number;
+    tools: McpTool[];
+    agent_initialized: boolean;
+}
+
+export async function getMcpStatus(): Promise<McpStatus> {
+    return apiFetch<McpStatus>('/mcp/status');
+}
+
+

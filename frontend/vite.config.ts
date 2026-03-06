@@ -38,6 +38,8 @@ export default defineConfig(({ mode }) => {
         '/device': 'http://localhost:8000',
         '/council': 'http://localhost:8000',
         '/scan': 'http://localhost:8000',
+        '/orchestrate': 'http://localhost:8000',
+        '/mcp': 'http://localhost:8000',
         '/docs': 'http://localhost:8000',
         '/ws': {
           target: 'http://localhost:8000',

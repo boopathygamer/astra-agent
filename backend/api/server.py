@@ -450,7 +450,7 @@ async def health():
 
 @app.post("/chat", response_model=ChatResponse, dependencies=[Depends(verify_api_key)])
 async def chat(request: ChatRequest):
-    """Conversational chat with memory and self-thinking."""
+    """Conversational chat with memory, self-thinking, and intelligent routing."""
     if not state.is_ready:
         raise HTTPException(503, "System not ready")
 
@@ -461,6 +461,40 @@ async def chat(request: ChatRequest):
         raise HTTPException(400, "Message too long (max 50,000 characters)")
 
     start = time.time()
+
+    # ── INTELLIGENT INTENT ROUTING ──
+    # Classify the query to see if a specialized system should handle it
+    try:
+        from brain.intent_router import get_intent_router
+        router = get_intent_router()
+        routing = router.classify(request.message)
+    except Exception as e:
+        logger.warning(f"Intent router error: {e}")
+        routing = None
+
+    routing_meta = {}
+    if routing and routing.target_system != "chat":
+        routing_meta = {
+            "routed_to": routing.target_system,
+            "routing_confidence": routing.confidence,
+            "routing_display": routing.display_name,
+            "routing_emoji": routing.display_emoji,
+        }
+        logger.info(f"Chat routed to: {routing.target_system} (conf={routing.confidence:.2f})")
+
+        # Dispatch to specialized systems
+        try:
+            routed_answer = _dispatch_to_system(routing.target_system, request.message)
+            if routed_answer is not None:
+                return ChatResponse(
+                    answer=routed_answer,
+                    confidence=routing.confidence,
+                    mode=f"routed:{routing.target_system}",
+                    duration_ms=(time.time() - start) * 1000,
+                    **routing_meta,
+                )
+        except Exception as e:
+            logger.warning(f"Specialized routing failed ({routing.target_system}): {e}, falling back to chat")
 
     try:
         if request.use_thinking:
@@ -479,6 +513,7 @@ async def chat(request: ChatRequest):
                     for s in (result.thinking_trace.steps if result.thinking_trace else [])
                 ],
                 duration_ms=(time.time() - start) * 1000,
+                **routing_meta,
             )
         else:
             answer = state.agent_controller.chat(request.message)
@@ -486,6 +521,7 @@ async def chat(request: ChatRequest):
                 answer=answer,
                 confidence=0.8,
                 duration_ms=(time.time() - start) * 1000,
+                **routing_meta,
             )
 
     except Exception as e:
@@ -1089,6 +1125,269 @@ async def device_unregister(request: dict):
     if mgr.unregister_device(device_id):
         return {"status": "removed", "device_id": device_id}
     raise HTTPException(404, "Device not found or is local")
+
+
+# ──────────────────────────────────────────────
+# Multi-Agent Orchestrator Endpoints
+# ──────────────────────────────────────────────
+
+@app.post("/orchestrate/debate", dependencies=[Depends(verify_api_key)])
+async def orchestrate_debate(request: dict):
+    """
+    Run a Multi-Agent Debate on a topic.
+    
+    Uses 3-stage flow: Expert Draft → Critic Review → Final Synthesis.
+    
+    Body: {"topic": "microservices vs monolith", "strategy": "debate"}
+    """
+    if not state.agent_controller:
+        raise HTTPException(503, "Agent not initialized")
+    
+    topic = request.get("topic", "").strip()
+    if not topic:
+        raise HTTPException(400, "Topic is required")
+    if len(topic) > 5000:
+        raise HTTPException(400, "Topic too long (max 5000 chars)")
+    
+    strategy = request.get("strategy", "debate").strip().lower()
+    
+    try:
+        import time as _time
+        start = _time.time()
+        
+        if strategy == "debate":
+            from agents.profiles.multi_agent_orchestrator import MultiAgentOrchestrator
+            orchestrator = MultiAgentOrchestrator(state.agent_controller)
+            result = orchestrator.orchestrate_debate(topic)
+            
+            return {
+                "strategy": "debate",
+                "topic": topic,
+                "answer": result.answer,
+                "confidence": result.confidence,
+                "mode": result.mode,
+                "error": result.error,
+                "duration_ms": (_time.time() - start) * 1000,
+            }
+        else:
+            # Use the full AgentOrchestrator for other strategies
+            from agents.orchestrator import AgentOrchestrator, OrchestratorStrategy
+            try:
+                strat_enum = OrchestratorStrategy(strategy)
+            except ValueError:
+                strat_enum = OrchestratorStrategy.AUTO
+            
+            orch = AgentOrchestrator(generate_fn=state.agent_controller.generate_fn)
+            result = orch.execute(topic, strategy=strat_enum)
+            
+            return {
+                "strategy": strategy,
+                "topic": topic,
+                "answer": result.final_output,
+                "confidence": result.confidence,
+                "sub_tasks": len(result.sub_results),
+                "duration_ms": result.total_duration_ms,
+                "summary": result.summary(),
+                "error": result.error,
+            }
+    except Exception as e:
+        logger.error(f"Orchestrate error: {type(e).__name__}", exc_info=True)
+        raise HTTPException(500, f"Orchestration failed: {str(e)}")
+
+
+@app.get("/orchestrate/status", dependencies=[Depends(verify_api_key)])
+async def orchestrate_status():
+    """Get orchestrator capabilities and routing stats."""
+    strategies = ["debate", "swarm", "pipeline", "hierarchy", "auto"]
+    
+    routing_stats = {}
+    try:
+        from brain.intent_router import get_intent_router
+        routing_stats = get_intent_router().get_stats()
+    except Exception:
+        pass
+    
+    return {
+        "available_strategies": strategies,
+        "agent_initialized": state.agent_controller is not None,
+        "routing_stats": routing_stats,
+    }
+
+
+# ──────────────────────────────────────────────
+# Intelligent Query Dispatch (used by /chat)
+# ──────────────────────────────────────────────
+
+def _dispatch_to_system(target: str, message: str) -> str:
+    """
+    Dispatch a chat message to a specialized backend system.
+    Returns the answer string, or None to fall back to normal chat.
+    """
+    if not state.agent_controller:
+        return None
+
+    if target == "orchestrator":
+        from agents.profiles.multi_agent_orchestrator import MultiAgentOrchestrator
+        orch = MultiAgentOrchestrator(state.agent_controller)
+        result = orch.orchestrate_debate(message)
+        return result.answer if not result.error else None
+
+    if target == "threat_scanner":
+        # Threat scanning through chat is handled by the agent's tools
+        return None
+
+    if target == "deep_researcher":
+        from agents.profiles.deep_researcher import DeepWebResearcher
+        researcher = DeepWebResearcher(state.agent_controller)
+        result = researcher.compile_dossier(message)
+        return result.answer if hasattr(result, 'answer') and not getattr(result, 'error', None) else None
+
+    if target == "devops_reviewer":
+        # DevOps needs a repo path — let the agent handle it naturally
+        return None
+
+    if target == "contract_hunter":
+        # Contract hunter needs a file — let agent handle it
+        return None
+
+    if target == "archivist":
+        # Archivist needs a directory — let agent handle it
+        return None
+
+    if target == "transpiler":
+        # Transpiler needs file paths — let agent handle it
+        return None
+
+    if target == "evolution":
+        from brain.evolution import CodeEvolutionEngine
+        from main import _app_state
+        registry = _app_state.get("registry")
+        if registry:
+            engine = CodeEvolutionEngine(registry)
+            test_cases = "if __name__ == '__main__':\n    pass"
+            best = engine.evolve(message, test_cases, generations=2)
+            if best:
+                return f"# 🧬 Code Evolution Result\n\n```python\n{best.code}\n```"
+        return None
+
+    if target == "devils_advocate":
+        from agents.profiles.devils_advocate import DevilsAdvocate
+        board = DevilsAdvocate(state.agent_controller)
+        result = board.audit_business_plan_text(message) if hasattr(board, 'audit_business_plan_text') else None
+        if result and hasattr(result, 'answer'):
+            return result.answer
+        return None
+
+    if target == "swarm":
+        from agents.profiles.swarm_intelligence import SwarmOrchestrator
+        swarm = SwarmOrchestrator(
+            generate_fn=state.agent_controller.generate_fn,
+            agent_controller=state.agent_controller,
+        )
+        result = swarm.api_execute(message)
+        return result.get("final_output") or result.get("answer") if isinstance(result, dict) else None
+
+    # For any unhandled targets, fall back to normal chat
+    return None
+
+
+
+# ──────────────────────────────────────────────
+# MCP (Model Context Protocol) Endpoints
+# ──────────────────────────────────────────────
+
+@app.get("/mcp/config", dependencies=[Depends(verify_api_key)])
+async def mcp_config(client: str = "claude"):
+    """
+    Generate ready-to-use MCP config JSON for a specific client.
+
+    Query: ?client=claude | cursor | vscode
+    """
+    import os
+    from pathlib import Path
+
+    project_root = str(Path(__file__).parent.parent.resolve()).replace("\\", "\\\\")
+    python_cmd = "python"
+
+    mcp_tools = [
+        "chat", "agent_task", "think", "quick_think", "analyze_code",
+        "execute_code", "search_web", "scan_threats", "analyze_file",
+        "memory_recall", "memory_store", "tutor_start", "tutor_respond",
+        "swarm_execute", "forge_tool", "transpile_code", "orchestrate_debate",
+        "evolve_code",
+    ]
+
+    base_config = {
+        "command": python_cmd,
+        "args": ["-m", "mcp_server"],
+        "cwd": project_root,
+        "env": {"LLM_PROVIDER": "auto"},
+    }
+
+    if client == "cursor":
+        return {
+            "mcpServers": {
+                "astra-agent": base_config
+            }
+        }
+    elif client == "vscode":
+        return {
+            "mcp": {
+                "servers": {
+                    "astra-agent": {
+                        "type": "stdio",
+                        **base_config,
+                    }
+                }
+            }
+        }
+    else:
+        # Claude Desktop (default)
+        return {
+            "mcpServers": {
+                "astra-agent": base_config
+            }
+        }
+
+
+@app.get("/mcp/status", dependencies=[Depends(verify_api_key)])
+async def mcp_status():
+    """Get MCP server info and available tools."""
+    from pathlib import Path
+
+    project_root = str(Path(__file__).parent.parent.resolve())
+
+    mcp_tools = [
+        {"name": "chat", "description": "Conversational AI with full agent pipeline"},
+        {"name": "agent_task", "description": "Complex task solving with tool orchestration"},
+        {"name": "think", "description": "Multi-iteration Synthesize → Verify → Learn loop"},
+        {"name": "quick_think", "description": "Fast single-pass reasoning"},
+        {"name": "analyze_code", "description": "Deep static analysis with 15 vulnerability detectors"},
+        {"name": "execute_code", "description": "Sandboxed code execution (Python, JS, Bash)"},
+        {"name": "search_web", "description": "Internet search via DuckDuckGo"},
+        {"name": "scan_threats", "description": "4-layer threat detection for files and directories"},
+        {"name": "analyze_file", "description": "Multimodal file analysis (PDF, image, audio)"},
+        {"name": "memory_recall", "description": "Query episodic long-term memory"},
+        {"name": "memory_store", "description": "Store episodes in long-term memory"},
+        {"name": "tutor_start", "description": "Start a Socratic tutoring session"},
+        {"name": "tutor_respond", "description": "Continue a tutoring conversation"},
+        {"name": "swarm_execute", "description": "Multi-agent swarm intelligence"},
+        {"name": "forge_tool", "description": "Create new tools at runtime"},
+        {"name": "transpile_code", "description": "Translate code between languages"},
+        {"name": "orchestrate_debate", "description": "Multi-agent debate pipeline"},
+        {"name": "evolve_code", "description": "RLHF-based code optimization"},
+    ]
+
+    return {
+        "project_root": project_root,
+        "transports": ["stdio", "http"],
+        "stdio_command": f"python -m mcp_server",
+        "http_command": f"python -m mcp_server --transport http --port 8080",
+        "http_url": "http://localhost:8080/mcp",
+        "tools_count": len(mcp_tools),
+        "tools": mcp_tools,
+        "agent_initialized": state.agent_controller is not None,
+    }
 
 
 # ──────────────────────────────────────────────

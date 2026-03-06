@@ -38,13 +38,18 @@ import {
   Archive,
   Activity,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Link2,
+  Copy,
+  Terminal,
+  Wrench,
+  Gamepad2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   sendChat, configureProviders, checkHealth, type ProviderKeys,
   scanFile, scanDirectory, scanUrl, getScanStats, getScanHistory,
-  quarantineFile, destroyThreat
+  quarantineFile, destroyThreat, getMcpConfig, getMcpStatus, type McpStatus
 } from './api';
 
 const CustomLogo = ({ className = "w-6 h-6" }: { className?: string }) => {
@@ -81,9 +86,16 @@ export default function Chat() {
   const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [isPlusMenuOpen, setPlusMenuOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'account' | 'api'>('account');
+  const [settingsTab, setSettingsTab] = useState<'account' | 'api' | 'mcp'>('account');
+
+  // ── MCP State ──
+  const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
+  const [mcpConfigs, setMcpConfigs] = useState<Record<string, any>>({});
+  const [mcpSelectedClient, setMcpSelectedClient] = useState<'claude' | 'cursor' | 'vscode'>('claude');
+  const [mcpCopied, setMcpCopied] = useState('');
+  const [mcpLoading, setMcpLoading] = useState(false);
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<{ text: string, isUser: boolean }[]>([]);
+  const [messages, setMessages] = useState<{ text: string, isUser: boolean, routedTo?: string, routingDisplay?: string, routingEmoji?: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [apiKeys, setApiKeys] = useState<ProviderKeys>({});
@@ -161,7 +173,13 @@ export default function Chat() {
 
     try {
       const res = await sendChat(userMessage);
-      setMessages(prev => [...prev, { text: res.answer, isUser: false }]);
+      setMessages(prev => [...prev, {
+        text: res.answer,
+        isUser: false,
+        routedTo: res.routed_to || undefined,
+        routingDisplay: res.routing_display || undefined,
+        routingEmoji: res.routing_emoji || undefined,
+      }]);
       setBackendStatus('connected');
     } catch (err: any) {
       const errorMsg = err?.message || 'Failed to reach the backend. Make sure the server is running.';
@@ -284,6 +302,10 @@ export default function Chat() {
                   <Code className="w-4 h-4" />
                   Web Dev
                 </Link>
+                <Link to="/game-dev" className="w-full flex items-center gap-3 px-2 py-2 text-sm text-white/80 hover:bg-white/5 hover:text-white rounded-lg transition-colors">
+                  <Gamepad2 className="w-4 h-4" />
+                  Game Dev
+                </Link>
               </div>
             </div>
 
@@ -361,6 +383,13 @@ export default function Chat() {
                         <CustomLogo className="w-5 h-5 text-white" />
                       </div>
                       <div className="pt-1.5 text-white/90">
+                        {msg.routedTo && msg.routingDisplay && (
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border bg-violet-500/10 text-violet-400 border-violet-500/20">
+                              {msg.routingEmoji} {msg.routingDisplay}
+                            </span>
+                          </div>
+                        )}
                         <div className="whitespace-pre-wrap leading-relaxed">
                           {msg.text}
                         </div>
@@ -402,13 +431,6 @@ export default function Chat() {
                 <div className="flex flex-col gap-0.5">
                   <button
                     className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
-                    onClick={() => { setPlusMenuOpen(false); setScannerOpen(true); getScanStats().then(setScanStats).catch(() => { }); }}
-                  >
-                    <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-                    Core Agent
-                  </button>
-                  <button
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
                     onClick={() => setPlusMenuOpen(false)}
                   >
                     <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
@@ -420,13 +442,6 @@ export default function Chat() {
                   >
                     <FileText className="w-3.5 h-3.5 text-emerald-400" />
                     Files
-                  </button>
-                  <button
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
-                    onClick={() => setPlusMenuOpen(false)}
-                  >
-                    <BrainCircuit className="w-3.5 h-3.5 text-emerald-400" />
-                    Deep Researcher
                   </button>
                 </div>
               </motion.div>
@@ -521,6 +536,31 @@ export default function Chat() {
                     <Key className="w-4 h-4" />
                     API Keys
                   </button>
+                  <button
+                    onClick={() => {
+                      setSettingsTab('mcp');
+                      if (!mcpStatus) {
+                        setMcpLoading(true);
+                        Promise.all([
+                          getMcpStatus().catch(() => null),
+                          getMcpConfig('claude').catch(() => null),
+                          getMcpConfig('cursor').catch(() => null),
+                          getMcpConfig('vscode').catch(() => null),
+                        ]).then(([status, claude, cursor, vscode]) => {
+                          if (status) setMcpStatus(status);
+                          setMcpConfigs({ claude, cursor, vscode });
+                          setMcpLoading(false);
+                        });
+                      }
+                    }}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${settingsTab === 'mcp'
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      }`}
+                  >
+                    <Link2 className="w-4 h-4" />
+                    MCP
+                  </button>
                 </div>
 
                 {/* Content */}
@@ -551,7 +591,7 @@ export default function Chat() {
                         </button>
                       </div>
                     </div>
-                  ) : (
+                  ) : settingsTab === 'api' ? (
                     <div className="space-y-6">
                       <div>
                         <h3 className="text-lg font-medium text-white mb-1">API Configuration</h3>
@@ -600,6 +640,135 @@ export default function Chat() {
                           {configStatus === 'saving' ? 'Connecting...' : 'Connect APIs'}
                         </button>
                       </div>
+                    </div>
+                  ) : (
+                    /* MCP Tab */
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium text-white mb-1 flex items-center gap-2">
+                          <Link2 className="w-5 h-5 text-cyan-400" />
+                          MCP Connection
+                        </h3>
+                        <p className="text-sm text-white/50 mb-4">Connect Astra Agent to Claude Desktop, Cursor, VS Code, or any MCP-compatible client.</p>
+                      </div>
+
+                      {mcpLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
+                        </div>
+                      ) : (
+                        <>
+                          {/* Connection URL */}
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-wider text-white/40">HTTP Endpoint</label>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-[#0a0a0a] border border-cyan-500/20 rounded-lg px-4 py-2.5 font-mono text-sm text-cyan-400">
+                                {mcpStatus?.http_url || 'http://localhost:8080/mcp'}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(mcpStatus?.http_url || 'http://localhost:8080/mcp');
+                                  setMcpCopied('url');
+                                  setTimeout(() => setMcpCopied(''), 2000);
+                                }}
+                                className="p-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 rounded-lg text-cyan-400 transition-colors"
+                              >
+                                {mcpCopied === 'url' ? <CheckCircle2 className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Client Config Picker */}
+                          <div className="space-y-3">
+                            <label className="text-xs font-bold uppercase tracking-wider text-white/40">Client Configuration</label>
+                            <div className="flex gap-1">
+                              {[
+                                { key: 'claude' as const, label: 'Claude Desktop' },
+                                { key: 'cursor' as const, label: 'Cursor' },
+                                { key: 'vscode' as const, label: 'VS Code' },
+                              ].map(({ key, label }) => (
+                                <button
+                                  key={key}
+                                  onClick={() => setMcpSelectedClient(key)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${mcpSelectedClient === key
+                                    ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/20'
+                                    : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                                    }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="relative">
+                              <pre className="bg-[#0a0a0a] border border-white/10 rounded-lg p-4 text-xs font-mono text-white/70 overflow-x-auto whitespace-pre">
+                                {JSON.stringify(mcpConfigs[mcpSelectedClient] || {}, null, 2)}
+                              </pre>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(JSON.stringify(mcpConfigs[mcpSelectedClient] || {}, null, 2));
+                                  setMcpCopied('config');
+                                  setTimeout(() => setMcpCopied(''), 2000);
+                                }}
+                                className="absolute top-2 right-2 p-1.5 bg-white/5 hover:bg-white/10 rounded-md text-white/40 hover:text-white transition-colors"
+                              >
+                                {mcpCopied === 'config' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-white/25 font-mono">
+                              {mcpSelectedClient === 'claude' ? 'Paste into: claude_desktop_config.json' :
+                                mcpSelectedClient === 'cursor' ? 'Paste into: .cursor/mcp.json' :
+                                  'Paste into: .vscode/settings.json'}
+                            </p>
+                          </div>
+
+                          {/* Terminal Commands */}
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold uppercase tracking-wider text-white/40">Server Commands</label>
+                            {[
+                              { label: 'stdio', cmd: mcpStatus?.stdio_command || 'python -m mcp_server' },
+                              { label: 'http', cmd: mcpStatus?.http_command || 'python -m mcp_server --transport http --port 8080' },
+                            ].map(({ label, cmd }) => (
+                              <div key={label} className="flex items-center gap-2">
+                                <span className="text-[10px] font-bold uppercase text-white/20 w-10">{label}</span>
+                                <div className="flex-1 flex items-center gap-2 bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-2">
+                                  <Terminal className="w-3.5 h-3.5 text-white/20 flex-shrink-0" />
+                                  <code className="text-xs font-mono text-white/60 flex-1">{cmd}</code>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(cmd);
+                                      setMcpCopied(label);
+                                      setTimeout(() => setMcpCopied(''), 2000);
+                                    }}
+                                    className="p-1 text-white/20 hover:text-white/60 transition-colors"
+                                  >
+                                    {mcpCopied === label ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Available Tools */}
+                          {mcpStatus?.tools && (
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold uppercase tracking-wider text-white/40">
+                                Available Tools ({mcpStatus.tools_count})
+                              </label>
+                              <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+                                {mcpStatus.tools.map((tool) => (
+                                  <div key={tool.name} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5">
+                                    <Wrench className="w-3 h-3 text-cyan-400/50 mt-0.5 flex-shrink-0" />
+                                    <div>
+                                      <span className="text-xs font-mono text-cyan-400/80">{tool.name}</span>
+                                      <p className="text-[10px] text-white/30">{tool.description}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
