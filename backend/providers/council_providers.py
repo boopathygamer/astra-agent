@@ -37,9 +37,17 @@ class CouncilProvider(ModelProvider):
     def _init_client(self):
         try:
             import openai
+            extra_kwargs: dict = {}
+            # OpenRouter requires HTTP-Referer & X-Title for proper attribution
+            if self.name == "openrouter":
+                extra_kwargs["default_headers"] = {
+                    "HTTP-Referer": "https://astra-agent.dev",
+                    "X-Title": "Astra Agent",
+                }
             self._client = openai.OpenAI(
                 api_key=self._api_key,
                 base_url=self._base_url,
+                **extra_kwargs,
             )
             logger.info(
                 f"✅ Council provider [{self.name}] initialized "

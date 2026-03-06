@@ -85,6 +85,7 @@ export interface ProviderKeys {
     gemini_api_key?: string;
     grok_api_key?: string;
     openrouter_api_key?: string;
+    openrouter_model?: string;
 }
 
 export interface ConfigureResult {

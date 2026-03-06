@@ -289,6 +289,10 @@ async def configure_providers(request: dict):
         "grok_api_key": "grok_api_key",
         "openrouter_api_key": "openrouter_api_key",
     }
+    # Optional model overrides
+    model_map = {
+        "openrouter_model": "openrouter_model",
+    }
 
     updated = []
     for req_key, config_attr in key_map.items():
@@ -296,6 +300,11 @@ async def configure_providers(request: dict):
         if value:
             setattr(provider_config, config_attr, value)
             updated.append(req_key.replace("_api_key", ""))
+    # Apply model overrides
+    for req_key, config_attr in model_map.items():
+        value = request.get(req_key, "").strip()
+        if value:
+            setattr(provider_config, config_attr, value)
 
     if not updated:
         return JSONResponse(
@@ -350,6 +359,11 @@ async def provider_status():
             }
 
         providers_info = registry.list_providers()
+        # Enrich with model names from config for frontend display
+        from config.settings import provider_config
+        model_lookup = {d.name: d.model for d in provider_config.configured_providers()}
+        for p in providers_info:
+            p["model"] = model_lookup.get(p.get("name", ""), p.get("model", ""))
         council_stats = None
         if registry.council:
             council_stats = registry.council.get_stats()

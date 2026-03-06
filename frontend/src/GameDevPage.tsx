@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    ArrowLeft, Send, Play, Code2, Globe, Download, Monitor, RotateCcw,
-    Maximize2, Shield, Loader2, CheckCircle2, XCircle,
+    ArrowLeft, Send, Play, Code2, Globe, Download, Monitor, RotateCcw, RotateCw,
+    Maximize2, Shield, Loader2, CheckCircle2, XCircle, Cpu,
     ChevronRight, FileCode, FileText, FolderOpen, Bot, Zap, Lock,
     Smartphone, Tablet, AlertTriangle, Clock, Activity, Terminal,
     Gamepad2, Upload
@@ -64,10 +64,11 @@ export default function GameDevPage() {
     const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
     const [activeFile, setActiveFile] = useState(0);
     const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
-    const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+    const [deviceView, setDeviceView] = useState<'android' | 'iphone'>('android');
+    const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
     const [agentLogs, setAgentLogs] = useState<string[]>([]);
     const chatEndRef = useRef<HTMLDivElement>(null);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
+    const deviceRef = useRef<HTMLIFrameElement>(null);
     const logsEndRef = useRef<HTMLDivElement>(null);
     const [showUploader, setShowUploader] = useState(false);
 
@@ -206,15 +207,17 @@ export default function GameDevPage() {
 
     // ── Iframe load ──
     useEffect(() => {
-        if (iframeRef.current && htmlContent) {
-            iframeRef.current.srcdoc = htmlContent;
+        if (deviceRef.current && htmlContent) {
+            deviceRef.current.srcdoc = htmlContent;
         }
-    }, [htmlContent]);
+    }, [htmlContent, deviceView]);
 
     useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
     useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [agentLogs]);
 
-    const vpWidth = viewport === 'desktop' ? '100%' : viewport === 'tablet' ? '768px' : '375px';
+    const isLandscape = orientation === 'landscape';
+    const deviceW = isLandscape ? 600 : 300;
+    const deviceH = isLandscape ? 300 : 600;
 
     return (
         <div className="h-screen bg-[#050505] text-white flex flex-col overflow-hidden font-sans selection:bg-orange-500/30">
@@ -237,17 +240,13 @@ export default function GameDevPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                    {/* Viewport Toggles */}
-                    {[
-                        { v: 'desktop' as const, Icon: Monitor, w: 'Desktop' },
-                        { v: 'tablet' as const, Icon: Tablet, w: 'Tablet' },
-                        { v: 'mobile' as const, Icon: Smartphone, w: 'Mobile' },
-                    ].map(({ v, Icon, w }) => (
-                        <button key={v} onClick={() => setViewport(v)} title={w}
-                            className={`p-1.5 rounded-md transition-colors ${viewport === v ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/60 hover:bg-white/5'}`}>
-                            <Icon className="w-3.5 h-3.5" />
-                        </button>
-                    ))}
+                    {/* Orientation Toggle */}
+                    <button onClick={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')} title={isLandscape ? 'Switch to Portrait' : 'Switch to Landscape'}
+                        className={`p-1.5 rounded-md transition-all flex items-center gap-1.5 text-[11px] font-medium ${isLandscape ? 'bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/20' : 'text-white/30 hover:text-white/60 hover:bg-white/5'
+                            }`}>
+                        <RotateCw className={`w-3.5 h-3.5 transition-transform duration-300 ${isLandscape ? 'rotate-90' : ''}`} />
+                        {isLandscape ? 'Landscape' : 'Portrait'}
+                    </button>
                     <div className="w-px h-5 bg-white/[0.06] mx-1" />
                     <button onClick={() => setShowUploader(true)} className="px-2.5 py-1 text-[11px] font-medium text-white/50 hover:text-white hover:bg-white/5 rounded-md transition-colors flex items-center gap-1.5">
                         <Upload className="w-3 h-3" /> Import
@@ -362,37 +361,105 @@ export default function GameDevPage() {
                     <div className="flex-1 relative overflow-hidden">
                         <AnimatePresence mode="wait">
                             {activeTab === 'preview' && (
-                                <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-center justify-center p-4 bg-[#111]">
-                                    <div className="h-full flex flex-col bg-[#1a1a1a] rounded-xl border border-white/[0.08] shadow-2xl overflow-hidden transition-all duration-300" style={{ width: vpWidth, maxWidth: '100%' }}>
-                                        {/* Browser Chrome */}
-                                        <div className="h-9 bg-[#1a1a1a] border-b border-white/[0.06] flex items-center px-3 gap-3 shrink-0">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
-                                                <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
-                                                <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
-                                            </div>
-                                            <div className="flex-1 max-w-md mx-auto bg-black/30 border border-white/[0.06] rounded-md h-6 flex items-center px-2.5">
-                                                <Gamepad2 className="w-2.5 h-2.5 text-orange-400 mr-1.5" />
-                                                <span className="text-[10px] text-white/30 font-mono">localhost:3000/game</span>
-                                            </div>
+                                <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-[#111]">
+                                    {/* Device Toggle + Orientation */}
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] rounded-full p-1">
+                                            <button onClick={() => setDeviceView('android')}
+                                                className={`px-4 py-1.5 text-[11px] font-bold rounded-full transition-all duration-300 flex items-center gap-2 ${deviceView === 'android' ? 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-400 ring-1 ring-emerald-500/30' : 'text-white/30 hover:text-white/50'
+                                                    }`}>
+                                                <span className="text-sm">🤖</span> Android
+                                            </button>
+                                            <button onClick={() => setDeviceView('iphone')}
+                                                className={`px-4 py-1.5 text-[11px] font-bold rounded-full transition-all duration-300 flex items-center gap-2 ${deviceView === 'iphone' ? 'bg-gradient-to-r from-blue-500/20 to-indigo-500/20 text-blue-400 ring-1 ring-blue-500/30' : 'text-white/30 hover:text-white/50'
+                                                    }`}>
+                                                <span className="text-sm">🍎</span> iPhone
+                                            </button>
                                         </div>
-                                        {/* Content */}
-                                        <div className="flex-1 bg-black overflow-auto">
-                                            {htmlContent ? (
-                                                <iframe ref={iframeRef} className="w-full h-full border-none" sandbox="allow-scripts allow-same-origin" title="Game Preview" />
-                                            ) : (
-                                                <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-4 p-8">
-                                                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-900/30 to-amber-900/30 flex items-center justify-center border border-orange-500/10">
-                                                        <Gamepad2 className="w-8 h-8 text-orange-500/50" />
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <p className="text-sm font-medium text-gray-500">Your game will render here</p>
-                                                        <p className="text-xs text-gray-600 mt-1">Describe what you want to build in the chat panel</p>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <button onClick={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')} title="Toggle Orientation"
+                                            className={`p-2 rounded-full transition-all border ${isLandscape ? 'bg-orange-500/15 border-orange-500/25 text-orange-400' : 'bg-white/[0.04] border-white/[0.08] text-white/30 hover:text-white/50'
+                                                }`}>
+                                            <RotateCw className={`w-4 h-4 transition-transform duration-500 ${isLandscape ? 'rotate-90' : ''}`} />
+                                        </button>
                                     </div>
+
+                                    {/* Device Frame */}
+                                    <AnimatePresence mode="wait">
+                                        {deviceView === 'android' ? (
+                                            <motion.div key={`android-${orientation}`} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }}
+                                                className="flex flex-col items-center">
+                                                <div className={`bg-[#1a1a1a] border-[6px] border-[#2a2a2a] shadow-[0_0_60px_rgba(0,0,0,0.5),0_0_120px_rgba(16,185,129,0.05)] relative overflow-hidden flex transition-all duration-500 ${isLandscape ? 'rounded-[2rem] flex-row' : 'rounded-[2rem] flex-col'}`} style={{ width: deviceW, height: deviceH }}>
+                                                    {/* Status bar */}
+                                                    {!isLandscape && (
+                                                        <div className="h-7 bg-[#1a1a1a] flex items-center justify-between px-5 shrink-0 z-10">
+                                                            <span className="text-[9px] text-white/30 font-mono">12:00</span>
+                                                            <div className="w-3 h-3 rounded-full bg-[#333] border border-white/10" />
+                                                            <div className="flex gap-1 items-center">
+                                                                <div className="w-3 h-1.5 rounded-sm bg-white/20" /><div className="w-2.5 h-1.5 rounded-sm bg-white/20" /><div className="text-[8px] text-white/25">100%</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 bg-black overflow-hidden">
+                                                        {htmlContent ? (
+                                                            <iframe ref={deviceRef} className="w-full h-full border-none" sandbox="allow-scripts allow-same-origin" title="Android Preview" />
+                                                        ) : (
+                                                            <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 p-4">
+                                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-900/30 to-amber-900/30 flex items-center justify-center border border-orange-500/10"><Gamepad2 className="w-7 h-7 text-orange-500/50" /></div>
+                                                                <p className="text-xs text-gray-400 text-center">Your game will render here</p>
+                                                                <p className="text-[10px] text-gray-500">Describe your game in the chat panel</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Nav bar */}
+                                                    {!isLandscape && (
+                                                        <div className="h-10 bg-[#1a1a1a] flex items-center justify-center gap-10 shrink-0">
+                                                            <div className="w-4 h-4 border-2 border-white/15 rounded-sm" />
+                                                            <div className="w-4 h-4 rounded-full border-2 border-white/15" />
+                                                            <div className="w-0 h-0 border-l-[7px] border-l-white/15 border-y-[5px] border-y-transparent" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        ) : (
+                                            <motion.div key={`iphone-${orientation}`} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.3 }}
+                                                className="flex flex-col items-center">
+                                                <div className={`bg-[#0d0d0d] border-[6px] border-[#2a2a2a] shadow-[0_0_60px_rgba(0,0,0,0.5),0_0_120px_rgba(99,102,241,0.05)] relative overflow-hidden flex transition-all duration-500 ${isLandscape ? 'rounded-[2rem] flex-row' : 'rounded-[3rem] flex-col'}`} style={{ width: deviceW, height: deviceH }}>
+                                                    {/* Dynamic Island */}
+                                                    {!isLandscape && (
+                                                        <>
+                                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-28 h-[22px] bg-black rounded-full z-20 flex items-center justify-center gap-2">
+                                                                <div className="w-2.5 h-2.5 rounded-full bg-[#1a1a2e] border border-[#333]" />
+                                                                <div className="w-1 h-1 rounded-full bg-[#333]" />
+                                                            </div>
+                                                            <div className="h-12 bg-transparent flex items-end justify-between px-8 pb-1 shrink-0 z-10">
+                                                                <span className="text-[10px] font-semibold text-white/40">9:41</span>
+                                                                <div className="flex gap-1 items-center">
+                                                                    <div className="w-3.5 h-1.5 rounded-sm bg-white/20" /><div className="w-3 h-1.5 rounded-sm bg-white/20" /><div className="w-5 h-2.5 rounded-sm bg-white/20 border border-white/10" />
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    <div className={`flex-1 bg-black overflow-hidden ${!isLandscape ? 'rounded-b-[2.5rem]' : ''}`}>
+                                                        {htmlContent ? (
+                                                            <iframe ref={deviceRef} className="w-full h-full border-none" sandbox="allow-scripts allow-same-origin" title="iPhone Preview" />
+                                                        ) : (
+                                                            <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 p-4">
+                                                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-900/30 to-amber-900/30 flex items-center justify-center border border-orange-500/10"><Gamepad2 className="w-7 h-7 text-orange-500/50" /></div>
+                                                                <p className="text-xs text-gray-400 text-center">Your game will render here</p>
+                                                                <p className="text-[10px] text-gray-500">Describe your game in the chat panel</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Home indicator */}
+                                                    {!isLandscape && (
+                                                        <div className="h-5 bg-[#0d0d0d] flex items-center justify-center shrink-0">
+                                                            <div className="w-28 h-1 rounded-full bg-white/15" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </motion.div>
                             )}
 

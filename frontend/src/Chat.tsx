@@ -47,10 +47,53 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
-  sendChat, configureProviders, checkHealth, type ProviderKeys,
+  sendChat, configureProviders, checkHealth, getProviderStatus, type ProviderKeys,
   scanFile, scanDirectory, scanUrl, getScanStats, getScanHistory,
   quarantineFile, destroyThreat, getMcpConfig, getMcpStatus, type McpStatus
 } from './api';
+
+// ── Slash Command Tools ────────────────────────────
+interface SlashTool {
+  id: string;
+  name: string;
+  description: string;
+  category: 'tool' | 'agent';
+  emoji: string;
+}
+
+const SLASH_TOOLS: SlashTool[] = [
+  // ── System Tools ──
+  { id: 'calculator', name: 'Calculator', description: 'Advanced math and calculations', category: 'tool', emoji: '🧮' },
+  { id: 'code_executor', name: 'Code Runner', description: 'Execute Python/JS code', category: 'tool', emoji: '▶️' },
+  { id: 'web_search', name: 'Web Search', description: 'Search the internet', category: 'tool', emoji: '🔍' },
+  { id: 'writer', name: 'Writer', description: 'Generate documents and content', category: 'tool', emoji: '✍️' },
+  { id: 'data_analyzer', name: 'Data Analyzer', description: 'Analyze and visualize data', category: 'tool', emoji: '📊' },
+  { id: 'file_ops', name: 'File Operations', description: 'Read, write, and manage files', category: 'tool', emoji: '📁' },
+  { id: 'doc_reader', name: 'Doc Reader', description: 'Read and parse documents', category: 'tool', emoji: '📄' },
+  { id: 'image_analyzer', name: 'Image Analyzer', description: 'Analyze and describe images', category: 'tool', emoji: '🖼️' },
+  { id: 'knowledge', name: 'Knowledge Base', description: 'Query stored knowledge', category: 'tool', emoji: '🧠' },
+  { id: 'task_planner', name: 'Task Planner', description: 'Plan and organize tasks', category: 'tool', emoji: '📋' },
+  { id: 'threat_guard', name: 'Threat Guard', description: 'Security scanning and threat detection', category: 'tool', emoji: '🛡️' },
+  { id: 'device_ops', name: 'Device Ops', description: 'Device management operations', category: 'tool', emoji: '📱' },
+  { id: 'folder_to_ppt', name: 'Folder to PPT', description: 'Convert folder contents to presentation', category: 'tool', emoji: '📽️' },
+  { id: 'game_dev_tools', name: 'Game Dev Tools', description: 'Game development utilities', category: 'tool', emoji: '🎮' },
+  { id: 'graph_research', name: 'Graph Research', description: 'Graph-based research and math', category: 'tool', emoji: '📈' },
+  { id: 'platform_support', name: 'Platform Support', description: 'Cross-platform development support', category: 'tool', emoji: '🖥️' },
+  { id: 'tool_forge', name: 'Tool Forge', description: 'Create and manage custom tools', category: 'tool', emoji: '🔨' },
+  { id: 'web_tester', name: 'Web Tester', description: 'Test websites and APIs', category: 'tool', emoji: '🧪' },
+  { id: 'policy', name: 'Policy Engine', description: 'Tool access control policies', category: 'tool', emoji: '📜' },
+  // ── Agent Profiles ──
+  { id: 'deep_researcher', name: 'Deep Researcher', description: 'In-depth research and analysis', category: 'agent', emoji: '🔬' },
+  { id: 'devils_advocate', name: "Devil's Advocate", description: 'Challenge assumptions and arguments', category: 'agent', emoji: '😈' },
+  { id: 'devops_reviewer', name: 'DevOps Reviewer', description: 'Review infrastructure and CI/CD', category: 'agent', emoji: '⚙️' },
+  { id: 'game_developer', name: 'Game Developer', description: 'Game design and development', category: 'agent', emoji: '🕹️' },
+  { id: 'gamified_tutor', name: 'Gamified Tutor', description: 'Learn through gamification', category: 'agent', emoji: '🎓' },
+  { id: 'contract_hunter', name: 'Contract Hunter', description: 'Find and analyze contracts', category: 'agent', emoji: '📑' },
+  { id: 'migration_architect', name: 'Migration Architect', description: 'Plan system migrations', category: 'agent', emoji: '🏗️' },
+  { id: 'orchestrator', name: 'Multi-Agent Orchestrator', description: 'Coordinate multiple agents', category: 'agent', emoji: '🎼' },
+  { id: 'swarm', name: 'Swarm Intelligence', description: 'Collaborative multi-agent swarm', category: 'agent', emoji: '🐝' },
+  { id: 'threat_hunter', name: 'Threat Hunter', description: 'Proactive security threat hunting', category: 'agent', emoji: '🕵️' },
+];
 
 const CustomLogo = ({ className = "w-6 h-6" }: { className?: string }) => {
   const grid = [
@@ -101,8 +144,18 @@ export default function Chat() {
   const [apiKeys, setApiKeys] = useState<ProviderKeys>({});
   const [configStatus, setConfigStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [configMessage, setConfigMessage] = useState('');
+  const [activeModelName, setActiveModelName] = useState<string>('');
+  const [providerList, setProviderList] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Slash Command State ──
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [slashFilter, setSlashFilter] = useState('');
+  const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
+  const [selectedTool, setSelectedTool] = useState<SlashTool | null>(null);
+  const slashMenuRef = useRef<HTMLDivElement>(null);
 
   // ── Core Agent Scanner State ──
   const [isScannerOpen, setScannerOpen] = useState(false);
@@ -128,6 +181,23 @@ export default function Chat() {
     checkBackend();
     const interval = setInterval(checkBackend, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // ── Fetch active model name for placeholder ──
+  useEffect(() => {
+    const fetchModel = async () => {
+      try {
+        const status = await getProviderStatus();
+        if (status?.providers?.length) {
+          setProviderList(status.providers);
+          const active = status.providers.find((p: any) => p.active);
+          if (active?.model) {
+            setActiveModelName(active.model);
+          }
+        }
+      } catch { /* backend may be offline */ }
+    };
+    fetchModel();
   }, []);
 
   useEffect(() => {
@@ -156,19 +226,84 @@ export default function Chat() {
       if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
         setPlusMenuOpen(false);
       }
+      if (slashMenuRef.current && !slashMenuRef.current.contains(event.target as Node)) {
+        setSlashMenuOpen(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // ── Slash Command Helpers ──
+  const filteredSlashTools = SLASH_TOOLS.filter(t =>
+    !slashFilter || t.name.toLowerCase().includes(slashFilter.toLowerCase()) || t.id.includes(slashFilter.toLowerCase()) || t.description.toLowerCase().includes(slashFilter.toLowerCase())
+  );
+
+  const handleSlashSelect = useCallback((tool: SlashTool) => {
+    setSelectedTool(tool);
+    setInput('');
+    setSlashMenuOpen(false);
+    setSlashFilter('');
+    setSlashSelectedIdx(0);
+    inputRef.current?.focus();
+  }, []);
+
+  const handleRemoveTool = useCallback(() => {
+    setSelectedTool(null);
+    inputRef.current?.focus();
+  }, []);
+
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+
+    // Don't reopen slash menu if a tool is already selected
+    if (selectedTool) {
+      setSlashMenuOpen(false);
+      return;
+    }
+
+    if (val === '/') {
+      setSlashMenuOpen(true);
+      setSlashFilter('');
+      setSlashSelectedIdx(0);
+    } else if (val.startsWith('/') && !val.includes(' ')) {
+      setSlashMenuOpen(true);
+      setSlashFilter(val.slice(1));
+      setSlashSelectedIdx(0);
+    } else {
+      setSlashMenuOpen(false);
+    }
+  }, [selectedTool]);
+
+  const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!slashMenuOpen) return;
+    const tools = filteredSlashTools;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSlashSelectedIdx(prev => Math.min(prev + 1, tools.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSlashSelectedIdx(prev => Math.max(prev - 1, 0));
+    } else if (e.key === 'Enter' && tools.length > 0) {
+      e.preventDefault();
+      handleSlashSelect(tools[slashSelectedIdx]);
+    } else if (e.key === 'Escape') {
+      setSlashMenuOpen(false);
+    }
+  }, [slashMenuOpen, filteredSlashTools, slashSelectedIdx, handleSlashSelect]);
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage = input.trim();
-    setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
+    const rawInput = input.trim();
+    // Prepend tool prefix if a tool is selected
+    const userMessage = selectedTool ? `/${selectedTool.id} ${rawInput}` : rawInput;
+    setMessages(prev => [...prev, { text: rawInput, isUser: true }]);
     setInput('');
+    setSelectedTool(null);
     setIsLoading(true);
 
     try {
@@ -418,6 +553,7 @@ export default function Chat() {
 
         {/* Input Area */}
         <div className="p-4 w-full max-w-3xl mx-auto relative">
+          {/* Plus Menu */}
           <AnimatePresence>
             {isPlusMenuOpen && (
               <motion.div
@@ -443,6 +579,97 @@ export default function Chat() {
                     <FileText className="w-3.5 h-3.5 text-emerald-400" />
                     Files
                   </button>
+                  <button
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] font-medium text-white/90 hover:bg-white/10 rounded-md transition-colors w-full text-left"
+                    onClick={() => { setPlusMenuOpen(false); setSlashMenuOpen(true); setSlashFilter(''); setSlashSelectedIdx(0); inputRef.current?.focus(); }}
+                  >
+                    <Folder className="w-3.5 h-3.5 text-emerald-400" />
+                    Tools
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Slash Command Dropdown */}
+          <AnimatePresence>
+            {slashMenuOpen && filteredSlashTools.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                transition={{ duration: 0.15 }}
+                ref={slashMenuRef}
+                className="absolute bottom-[calc(100%-0.5rem)] left-4 right-4 bg-[#1c1c1c] border border-white/10 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.6)] z-50 max-h-[340px] overflow-hidden flex flex-col"
+              >
+                <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">Tools & Agents</span>
+                  <span className="text-[10px] text-white/15">— type to filter</span>
+                </div>
+                <div className="overflow-y-auto custom-scrollbar py-1">
+                  {/* Tools Category */}
+                  {filteredSlashTools.some(t => t.category === 'tool') && (
+                    <>
+                      <div className="px-3 pt-2 pb-1">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-emerald-500/50">🔧 System Tools</span>
+                      </div>
+                      {filteredSlashTools.filter(t => t.category === 'tool').map((tool) => {
+                        const globalIdx = filteredSlashTools.indexOf(tool);
+                        return (
+                          <button
+                            key={tool.id}
+                            onClick={() => handleSlashSelect(tool)}
+                            onMouseEnter={() => setSlashSelectedIdx(globalIdx)}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${globalIdx === slashSelectedIdx ? 'bg-emerald-500/10 text-white' : 'text-white/70 hover:bg-white/[0.04]'}`}
+                          >
+                            <Folder className={`w-3.5 h-3.5 flex-shrink-0 ${globalIdx === slashSelectedIdx ? 'text-emerald-400' : 'text-white/20'}`} />
+                            <span className="text-sm flex-shrink-0">{tool.emoji}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[13px] font-semibold">{tool.name}</span>
+                                <span className="text-[10px] font-mono text-white/20">/{tool.id}</span>
+                              </div>
+                              <p className="text-[11px] text-white/30 truncate">{tool.description}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                  {/* Agents Category */}
+                  {filteredSlashTools.some(t => t.category === 'agent') && (
+                    <>
+                      <div className="px-3 pt-3 pb-1">
+                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-violet-500/50">🤖 Agent Profiles</span>
+                      </div>
+                      {filteredSlashTools.filter(t => t.category === 'agent').map((tool) => {
+                        const globalIdx = filteredSlashTools.indexOf(tool);
+                        return (
+                          <button
+                            key={tool.id}
+                            onClick={() => handleSlashSelect(tool)}
+                            onMouseEnter={() => setSlashSelectedIdx(globalIdx)}
+                            className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${globalIdx === slashSelectedIdx ? 'bg-violet-500/10 text-white' : 'text-white/70 hover:bg-white/[0.04]'}`}
+                          >
+                            <Folder className={`w-3.5 h-3.5 flex-shrink-0 ${globalIdx === slashSelectedIdx ? 'text-violet-400' : 'text-white/20'}`} />
+                            <span className="text-sm flex-shrink-0">{tool.emoji}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[13px] font-semibold">{tool.name}</span>
+                                <span className="text-[10px] font-mono text-white/20">/{tool.id}</span>
+                              </div>
+                              <p className="text-[11px] text-white/30 truncate">{tool.description}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+                <div className="px-3 py-1.5 border-t border-white/5 flex items-center gap-3 text-[10px] text-white/20">
+                  <span><kbd className="px-1 py-0.5 bg-white/5 rounded text-[9px]">↑↓</kbd> navigate</span>
+                  <span><kbd className="px-1 py-0.5 bg-white/5 rounded text-[9px]">↵</kbd> select</span>
+                  <span><kbd className="px-1 py-0.5 bg-white/5 rounded text-[9px]">esc</kbd> close</span>
                 </div>
               </motion.div>
             )}
@@ -456,11 +683,23 @@ export default function Chat() {
             >
               <Plus className={`w-6 h-6 transition-transform duration-200 ${isPlusMenuOpen ? 'rotate-45' : ''}`} />
             </button>
+            {/* Selected Tool Badge */}
+            {selectedTool && (
+              <div className="flex items-center gap-1 ml-2 px-2 py-0.5 bg-emerald-500/20 border border-emerald-500/30 rounded-full flex-shrink-0">
+                <span className="text-[11px]">{selectedTool.emoji}</span>
+                <span className="text-[11px] font-semibold text-emerald-400">{selectedTool.name}</span>
+                <button type="button" onClick={handleRemoveTool} className="ml-0.5 p-0.5 text-emerald-400/60 hover:text-emerald-300 transition-colors rounded-full hover:bg-emerald-400/10">
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            )}
             <input
+              ref={inputRef}
               type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything"
+              onChange={handleInputChange}
+              onKeyDown={handleInputKeyDown}
+              placeholder={selectedTool ? `Ask ${selectedTool.name}...` : activeModelName ? `Ask ${activeModelName}... (type / for tools)` : 'Ask anything (type / for tools)'}
               className="flex-1 bg-transparent border-none outline-none px-3 text-white placeholder-white/30 text-base"
             />
             <div className="flex items-center gap-2">
@@ -600,23 +839,50 @@ export default function Chat() {
 
                       <div className="space-y-4">
                         {[
-                          { name: 'OpenAI API Key', placeholder: 'sk-proj-...', key: 'openai_api_key' as const },
-                          { name: 'Anthropic API Key', placeholder: 'sk-ant-...', key: 'claude_api_key' as const },
-                          { name: 'Google Gemini API Key', placeholder: 'AIzaSy...', key: 'gemini_api_key' as const },
-                          { name: 'Grok API Key', placeholder: 'xai-...', key: 'grok_api_key' as const },
-                          { name: 'OpenRouter API Key', placeholder: 'sk-or-...', key: 'openrouter_api_key' as const }
-                        ].map((api, idx) => (
-                          <div key={idx} className="space-y-1.5">
-                            <label className="text-sm font-medium text-white/80">{api.name}</label>
-                            <input
-                              type="password"
-                              placeholder={api.placeholder}
-                              value={(apiKeys as any)[api.key] || ''}
-                              onChange={(e) => setApiKeys(prev => ({ ...prev, [api.key]: e.target.value }))}
-                              className="w-full bg-[#0a0a0a] border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-2.5 text-white placeholder-white/20 outline-none transition-colors"
-                            />
-                          </div>
-                        ))}
+                          { name: 'OpenAI', placeholder: 'sk-proj-...', key: 'openai_api_key' as const, model: 'gpt-4o', color: 'text-green-400' },
+                          { name: 'Anthropic', placeholder: 'sk-ant-...', key: 'claude_api_key' as const, model: 'claude-sonnet-4-20250514', color: 'text-orange-400' },
+                          { name: 'Google Gemini', placeholder: 'AIzaSy...', key: 'gemini_api_key' as const, model: 'gemini-2.5-pro', color: 'text-blue-400' },
+                          { name: 'Grok (xAI)', placeholder: 'xai-...', key: 'grok_api_key' as const, model: 'grok-3', color: 'text-purple-400' },
+                          { name: 'OpenRouter', placeholder: 'sk-or-...', key: 'openrouter_api_key' as const, model: 'meta-llama/llama-4-maverick', color: 'text-cyan-400' }
+                        ].map((api, idx) => {
+                          const liveProvider = providerList.find((p: any) => p.name === api.key.replace('_api_key', ''));
+                          const isActive = liveProvider?.active;
+                          const liveModel = liveProvider?.model || api.model;
+                          return (
+                            <div key={idx} className="space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-medium text-white/80 flex items-center gap-2">
+                                  {api.name}
+                                  {isActive && (
+                                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">active</span>
+                                  )}
+                                </label>
+                                <span className={`text-[10px] font-mono ${api.color} opacity-60`}>{liveModel}</span>
+                              </div>
+                              <input
+                                type="password"
+                                placeholder={api.placeholder}
+                                value={(apiKeys as any)[api.key] || ''}
+                                onChange={(e) => setApiKeys(prev => ({ ...prev, [api.key]: e.target.value }))}
+                                className="w-full bg-[#0a0a0a] border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-2.5 text-white placeholder-white/20 outline-none transition-colors"
+                              />
+                              {/* OpenRouter model selector */}
+                              {api.key === 'openrouter_api_key' && (
+                                <div className="mt-1.5">
+                                  <label className="text-[11px] font-medium text-white/40 mb-1 block">Model Name</label>
+                                  <input
+                                    type="text"
+                                    placeholder="meta-llama/llama-4-maverick"
+                                    value={apiKeys.openrouter_model || ''}
+                                    onChange={(e) => setApiKeys(prev => ({ ...prev, openrouter_model: e.target.value }))}
+                                    className="w-full bg-[#0a0a0a] border border-white/10 focus:border-cyan-500/50 rounded-lg px-4 py-2 text-sm text-cyan-400 placeholder-white/15 outline-none transition-colors font-mono"
+                                  />
+                                  <p className="text-[10px] text-white/20 mt-1">Browse models at <a href="https://openrouter.ai/models" target="_blank" rel="noopener" className="text-cyan-500/60 hover:text-cyan-400 transition-colors">openrouter.ai/models</a></p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
 
                       {configMessage && (

@@ -17,12 +17,18 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      // Do not modify — file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
-        // Forward all backend API paths to the FastAPI server
-        // Note: /agent and /tutor are also frontend routes, so proxy specific sub-paths
-        '/chat': 'http://localhost:8000',
+        // Forward backend API paths to the FastAPI server.
+        // /chat collides with the frontend route, so use bypass to let
+        // browser page navigations (Accept: text/html) fall through to the SPA.
+        '/chat': {
+          target: 'http://localhost:8000',
+          bypass(req) {
+            if (req.headers.accept?.includes('text/html')) return req.url;
+          },
+        },
         '/health': 'http://localhost:8000',
         '/providers': 'http://localhost:8000',
         '/agent/task': 'http://localhost:8000',
