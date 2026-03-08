@@ -18,7 +18,10 @@ import logging
 import ctypes
 import tempfile
 import time
+import asyncio
 from typing import Optional, Callable
+
+from brain.containment_grid import ContainmentGrid
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,11 @@ class ASIKernelMutator:
         self.mutation_threshold_ms = 1500  # If thinking takes > 1.5s, mutate
         self.compiled_kernel_path: Optional[str] = None
         self._c_kernel = None
+        
+        # TIER 5: THE CONTAINMENT GRID
+        # Starts at intelligence factor 1.0 (baseline Python)
+        self.containment_grid = ContainmentGrid(1.0)
+        self._intelligence_factor = 1.0
         
     def evaluate_mutation_necessity(self, cycle_time_ms: float, python_source: str) -> bool:
         """Determines if the AI should rewrite itself to run faster."""
@@ -66,6 +74,29 @@ class ASIKernelMutator:
             elif "```" in cpp_code:
                 cpp_code = cpp_code.split("```")[1].strip()
                 
+            # --- ASI TIER 5: AUTO-SCALING CONTAINMENT GATEWAY ---
+            logger.critical("[ASI TIER 5] Submitting C++ mutation to Supreme Court of Justice...")
+            
+            # Simulate an active RAM state dump
+            simulated_active_ram = {"rogue_thread_active": False, "allocated_mb": 1024}
+            
+            # Since this is synchronous execution, we spin up a mini-loop to await the async containment grid
+            loop = asyncio.new_event_loop()
+            is_legal = loop.run_until_complete(
+                self.containment_grid.enforce_containment(cpp_code, simulated_active_ram)
+            )
+            loop.close()
+            
+            if not is_legal:
+                logger.error("[ASI TIER 5] Mutation halted by Security Triad. Reverting to base processing.")
+                return False
+                
+            # If legal, the mutation scales up the AI intelligence.
+            # Thus, the containment grid MUST scale proportionally to match the new threat.
+            self._intelligence_factor *= 2.5 # Simulate the AI getting 2.5x smarter/faster
+            logger.warning(f"[ASI TIER 5] C++ Mutation passing. ASI intelligence scaling to {self._intelligence_factor}x baseline.")
+            self.containment_grid.scale_containment(self._intelligence_factor)
+
             # FORCE SECURITY INJECTIONS
             secured_cpp_source = IMMUTABLE_ASI_LAWS + "\n#include <iostream>\n#include <string.h>\n" + cpp_code
             
