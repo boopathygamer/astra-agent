@@ -6,12 +6,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Cpu, 
-  Zap, 
-  Globe, 
-  ChevronRight, 
-  Bot, 
+import {
+  Cpu,
+  Zap,
+  Globe,
+  ChevronRight,
+  Bot,
   Code,
   ArrowRight,
   Menu,
@@ -41,7 +41,7 @@ const RobotBuilderCanvas = () => {
     let height = canvas.height = window.innerHeight;
 
     let time = 0;
-    
+
     let isVisible = true;
     const observer = new IntersectionObserver((entries) => {
       isVisible = entries[0].isIntersecting;
@@ -59,10 +59,10 @@ const RobotBuilderCanvas = () => {
       const offsetY = (time * 10) % size;
 
       ctx.beginPath();
-      for(let x = -offsetX; x < width; x += size) {
+      for (let x = -offsetX; x < width; x += size) {
         ctx.moveTo(x, 0); ctx.lineTo(x, height);
       }
-      for(let y = -offsetY; y < height; y += size) {
+      for (let y = -offsetY; y < height; y += size) {
         ctx.moveTo(0, y); ctx.lineTo(width, y);
       }
       ctx.stroke();
@@ -73,7 +73,7 @@ const RobotBuilderCanvas = () => {
       if (!isVisible) return;
 
       time += 0.016;
-      
+
       // Motion blur trail
       ctx.fillStyle = 'rgba(2, 2, 2, 0.4)';
       ctx.fillRect(0, 0, width, height);
@@ -81,7 +81,7 @@ const RobotBuilderCanvas = () => {
       drawGrid();
 
       // Vignette
-      const gradient = ctx.createRadialGradient(width/2, height/2, height/3, width/2, height/2, height);
+      const gradient = ctx.createRadialGradient(width / 2, height / 2, height / 3, width / 2, height / 2, height);
       gradient.addColorStop(0, 'transparent');
       gradient.addColorStop(1, 'rgba(0,0,0,0.9)');
       ctx.fillStyle = gradient;
@@ -108,7 +108,7 @@ const RobotBuilderCanvas = () => {
 
 const CustomCursor = () => {
   const [pos, setPos] = useState({ x: 0, y: 0 });
-  
+
   useEffect(() => {
     const updatePos = (e: MouseEvent) => {
       setPos({ x: e.clientX, y: e.clientY });
@@ -118,7 +118,7 @@ const CustomCursor = () => {
   }, []);
 
   return (
-    <motion.div 
+    <motion.div
       className="fixed top-0 left-0 w-8 h-8 rounded-full border-2 border-brand-primary pointer-events-none z-[100] mix-blend-screen hidden md:block"
       animate={{ x: pos.x - 16, y: pos.y - 16 }}
       transition={{ type: 'spring', stiffness: 500, damping: 28, mass: 0.5 }}
@@ -129,38 +129,14 @@ const CustomCursor = () => {
 };
 
 const CustomLogo = ({ className = "w-8 h-8" }: { className?: string }) => {
-  const grid = [
-    ".....1111.......",
-    "....111111......",
-    "....111111......",
-    "....1111111.....",
-    "....111111......",
-    "....1...11......",
-    "....11..11......",
-    "....111111......",
-    "....111111.11...",
-    "....1111...11...",
-    "....11111..1....",
-    ".....111........",
-    "......111.......",
-    ".......111......",
-    ".......11.......",
-  ];
-
   return (
-    <svg viewBox="0 0 16 15" className={`${className} drop-shadow-[0_0_12px_rgba(255,255,255,0.9)]`} fill="#FFFFFF" xmlns="http://www.w3.org/2000/svg">
-      {grid.map((row, y) => 
-        row.split('').map((cell, x) => 
-          cell === '1' ? <rect key={`${x}-${y}`} x={x} y={y} width="1.05" height="1.05" /> : null
-        )
-      )}
-    </svg>
+    <img src="/logo.png" className={`${className} object-contain border-0`} alt="Astra Agent Logo" />
   );
 };
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  
+
   return (
     <nav className="fixed top-0 left-0 w-full z-50">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -181,10 +157,10 @@ const Navbar = () => {
           </button>
         </div>
       </div>
-      
+
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -217,7 +193,7 @@ const StatBlock = ({ label, value }) => (
 const AdvancedHeading = () => {
   const text1 = "Engineered";
   const text2 = "For Scale";
-  
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.8 }}
@@ -227,8 +203,8 @@ const AdvancedHeading = () => {
       className="relative inline-block perspective-1000"
     >
       {/* Background Glow */}
-      <motion.div 
-        animate={{ 
+      <motion.div
+        animate={{
           scale: [1, 1.2, 1],
           opacity: [0.2, 0.5, 0.2],
           rotateZ: [0, 5, 0, -5, 0]
@@ -236,11 +212,11 @@ const AdvancedHeading = () => {
         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         className="absolute inset-0 bg-brand-primary/40 blur-[40px] -z-10 rounded-full"
       />
-      
+
       <h2 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter mb-6 uppercase relative z-10 leading-[0.85] flex flex-col items-center">
         {/* Top Line */}
         <div className="relative overflow-hidden pb-2">
-          <motion.span 
+          <motion.span
             initial={{ y: "100%" }}
             whileInView={{ y: 0 }}
             transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
@@ -248,7 +224,7 @@ const AdvancedHeading = () => {
           >
             {text1}
           </motion.span>
-          <motion.div 
+          <motion.div
             animate={{ x: ["-100%", "200%"] }}
             transition={{ duration: 3, repeat: Infinity, ease: "linear", delay: 1 }}
             className="absolute top-0 left-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 z-30 mix-blend-overlay"
@@ -257,7 +233,7 @@ const AdvancedHeading = () => {
 
         {/* Bottom Line */}
         <div className="relative overflow-hidden">
-          <motion.span 
+          <motion.span
             initial={{ y: "-100%" }}
             whileInView={{ y: 0 }}
             transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -265,9 +241,9 @@ const AdvancedHeading = () => {
           >
             {text2}
           </motion.span>
-          
+
           {/* Glitch Layers for Bottom Line */}
-          <motion.span 
+          <motion.span
             animate={{ x: [-3, 3, -3], y: [2, -2, 2], opacity: [0, 0.8, 0] }}
             transition={{ duration: 0.15, repeat: Infinity, repeatType: "reverse", repeatDelay: 2 }}
             className="absolute top-0 left-0 w-full h-full text-brand-primary mix-blend-screen blur-[2px] -z-10 block"
@@ -275,7 +251,7 @@ const AdvancedHeading = () => {
           >
             {text2}
           </motion.span>
-          <motion.span 
+          <motion.span
             animate={{ x: [3, -3, 3], y: [-2, 2, -2], opacity: [0, 0.8, 0] }}
             transition={{ duration: 0.2, repeat: Infinity, repeatType: "reverse", repeatDelay: 2.1 }}
             className="absolute top-0 left-0 w-full h-full text-[#ff00ff] mix-blend-screen blur-[1px] -z-10 block"
@@ -285,15 +261,15 @@ const AdvancedHeading = () => {
           </motion.span>
         </div>
       </h2>
-      
+
       {/* Decorative Lines */}
-      <motion.div 
+      <motion.div
         initial={{ scaleX: 0 }}
         whileInView={{ scaleX: 1 }}
         transition={{ duration: 1, delay: 0.5 }}
         className="absolute -left-12 top-1/2 w-8 h-px bg-brand-primary/50"
       />
-      <motion.div 
+      <motion.div
         initial={{ scaleX: 0 }}
         whileInView={{ scaleX: 1 }}
         transition={{ duration: 1, delay: 0.5 }}
@@ -315,7 +291,7 @@ const CyberButton = ({ text, onClick, className = "" }: { text: string, onClick?
           <div className="absolute top-3 left-8 w-1 h-3 bg-white"></div>
           <div className="absolute top-4 left-9 w-1 h-1 bg-white"></div>
         </div>
-        
+
         <span className="mr-2 relative z-10">{text}</span>
         <ChevronRight className="w-6 h-6 stroke-[3] relative z-10" />
       </div>
@@ -406,7 +382,7 @@ const MindMap = () => {
         const isHovered = hoveredNode === node.id;
         const x = isMobile ? node.mobileX : node.x;
         const y = isMobile ? node.mobileY : node.y;
-        
+
         return (
           <motion.div
             key={node.id}
@@ -476,15 +452,15 @@ export default function App() {
     <div className="min-h-screen selection:bg-brand-primary selection:text-black crt cursor-none">
       <CustomCursor />
       <Navbar />
-      
+
       {/* Hero Section */}
       <section className="relative pt-24 pb-12 md:pt-32 md:pb-20 px-6 overflow-hidden min-h-screen flex items-center justify-center">
         <RobotBuilderCanvas />
-        <motion.div 
+        <motion.div
           style={{ opacity, scale }}
           className="max-w-7xl mx-auto text-center relative z-10 mt-12 md:mt-24"
         >
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -497,8 +473,8 @@ export default function App() {
               <div className="glitch text-brand-primary" data-text="SYSTEM">SYSTEM</div>
             </div>
           </motion.h1>
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -528,10 +504,10 @@ export default function App() {
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="mb-16 md:mb-32 text-center sticky top-10 z-0 flex flex-col items-center justify-center min-h-[30vh] md:min-h-[40vh]">
             <AdvancedHeading />
-            
+
             <MindMap />
 
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -10 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
@@ -550,7 +526,7 @@ export default function App() {
             </motion.div>
           </div>
         </div>
-        
+
         {/* Background VFX */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-1/4 left-0 w-full h-px bg-gradient-to-r from-transparent via-brand-primary/20 to-transparent" />
@@ -572,24 +548,24 @@ export default function App() {
           >
             {/* Glowing Orb Background */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-brand-primary/20 rounded-full blur-[100px] animate-pulse" />
-            
+
             <h2 className="text-6xl md:text-9xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/10 relative z-10 mb-4">
               AESCE
             </h2>
-            
-            <motion.div 
+
+            <motion.div
               initial={{ width: 0 }}
               whileInView={{ width: "100%" }}
               transition={{ duration: 1.5, delay: 0.5 }}
               className="h-px bg-gradient-to-r from-transparent via-brand-primary to-transparent w-full mb-6"
             />
-            
+
             <p className="text-brand-primary font-mono text-sm md:text-xl tracking-[0.2em] uppercase glow-text">
               auto-evolution & synthesized consciousness engine
             </p>
           </motion.div>
         </div>
-        
+
         {/* Particle/Grid VFX */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,65,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,65,0.03)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)]" />
@@ -603,7 +579,7 @@ export default function App() {
             <h2 className="text-3xl md:text-5xl lg:text-7xl font-bold tracking-tighter mb-6 md:mb-8 max-w-2xl">Ready to build the future?</h2>
             <p className="text-black/70 text-lg md:text-xl mb-8 md:mb-12 max-w-xl font-medium">Join 50,000+ developers building the next generation of astra applications.</p>
           </div>
-          
+
           {/* Decorative elements */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/5 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2" />
@@ -621,9 +597,9 @@ export default function App() {
             <p className="text-white/40 text-sm max-w-xs">Building the infrastructure for the astra economy. Recursive, resilient, and ready.</p>
             <div className="group flex items-center gap-3 px-4 py-2 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:border-brand-primary/50 transition-all duration-300 cursor-pointer w-fit backdrop-blur-sm">
               <div className="relative w-5 h-5 rounded-full overflow-hidden border border-white/20 group-hover:border-brand-primary transition-colors shadow-sm">
-                <img 
-                  src="https://flagcdn.com/w40/in.png" 
-                  alt="India" 
+                <img
+                  src="https://flagcdn.com/w40/in.png"
+                  alt="India"
                   className="w-full h-full object-cover scale-110"
                 />
               </div>
@@ -633,7 +609,7 @@ export default function App() {
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 md:gap-20">
             <div className="space-y-4">
               <h4 className="text-xs font-bold uppercase tracking-widest text-white/40">Product</h4>
@@ -664,7 +640,7 @@ export default function App() {
             </div>
           </div>
         </div>
-        
+
         <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-white/20 font-mono">
           <p>© 2026 ASTRA AGENT PROTOCOL. ALL RIGHTS RESERVED.</p>
           <div className="flex gap-6">

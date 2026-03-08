@@ -247,6 +247,7 @@ class AgentController:
         use_thinking_loop: bool = True,
         max_tool_calls: int = None,
         session_id: str = None,
+        event_callback: Optional[Callable[[dict], None]] = None,
     ) -> AgentResponse:
         """
         Process a user request through the full agent pipeline.
@@ -298,9 +299,32 @@ class AgentController:
 
         with self.tracer.span("universal_routing") as route_span:
             # Step 0: UNIVERSAL — Domain classification + Persona detection
+            if event_callback:
+                event_callback({
+                    "type": "execution_step",
+                    "step": 1,
+                    "phase": "routing",
+                    "agent": self.agent_id,
+                    "action": "Classifying domain and detecting persona...",
+                    "duration": 0,
+                    "status": "running"
+                })
+            
+            route_start = time.time()
             domain_match = self.domain_router.classify(user_input)
             persona = self.persona_engine.detect(user_input)
             
+            if event_callback:
+                event_callback({
+                    "type": "execution_step",
+                    "step": 1,
+                    "phase": "routing",
+                    "agent": self.agent_id,
+                    "action": f"Routed to '{domain_match.primary_domain}' domain as {persona.name}",
+                    "duration": round((time.time() - route_start) * 1000),
+                    "status": "done"
+                })
+
             route_span.attributes["primary_domain"] = domain_match.primary_domain
             route_span.attributes["persona"] = persona.name
         
@@ -335,8 +359,32 @@ class AgentController:
 
         with self.tracer.span("compile_task") as comp_span:
             # Step 1: COMPILE — Parse user request
+            if event_callback:
+                event_callback({
+                    "type": "execution_step",
+                    "step": 2,
+                    "phase": "thinking",
+                    "agent": self.agent_id,
+                    "action": "Compiling task requirements and building strategy...",
+                    "duration": 0,
+                    "status": "running"
+                })
+            
+            comp_start = time.time()
             task_spec = self.compiler.compile(user_input)
             response.task_spec = task_spec
+            
+            if event_callback:
+                event_callback({
+                    "type": "execution_step",
+                    "step": 2,
+                    "phase": "thinking",
+                    "agent": self.agent_id,
+                    "action": f"Task compiled: {task_spec.action_type} (tools: {len(task_spec.tools_needed)})",
+                    "duration": round((time.time() - comp_start) * 1000),
+                    "status": "done"
+                })
+
             comp_span.attributes["action_type"] = task_spec.action_type
             comp_span.attributes["tools_needed"] = len(task_spec.tools_needed)
 
@@ -358,6 +406,7 @@ class AgentController:
             tool_results = self._execute_tools_guarded(
                 user_input, task_spec, max_calls=max_tools,
                 session_id=active_session,
+                event_callback=event_callback,
             )
             response.tools_used = tool_results
             response.loop_warnings = [
@@ -374,10 +423,23 @@ class AgentController:
 
         with self.tracer.span("think") as think_span:
             # Step 4: THINK — Use the thinking loop or direct generation
+            if event_callback:
+                event_callback({
+                    "type": "execution_step",
+                    "step": 4,
+                    "phase": "synthesis",
+                    "agent": self.agent_id,
+                    "action": "Synthesizing answer with continuous thinking loop...",
+                    "duration": 0,
+                    "status": "running"
+                })
+            
+            synth_start = time.time()
             if use_thinking_loop and task_spec.action_type != "general":
                 thinking_result = self.thinking_loop.think(
                     problem=enhanced_prompt,
                     action_type=task_spec.action_type,
+                    event_callback=event_callback,
                 )
                 response.answer = thinking_result.final_answer
                 response.thinking_trace = thinking_result
@@ -394,6 +456,17 @@ class AgentController:
                 response.confidence = 0.8
                 response.iterations = 1
                 response.mode = "direct"
+                
+            if event_callback:
+                event_callback({
+                    "type": "execution_step",
+                    "step": 4,
+                    "phase": "complete",
+                    "agent": self.agent_id,
+                    "action": "Synthesis complete.",
+                    "duration": round((time.time() - synth_start) * 1000),
+                    "status": "done"
+                })
                 
             think_span.attributes["mode"] = response.mode
             think_span.attributes["confidence"] = response.confidence
@@ -488,8 +561,21 @@ class AgentController:
         task_spec: TaskSpec,
         max_calls: int,
         session_id: str = "",
+        event_callback: Optional[Callable[[dict], None]] = None,
     ) -> List[dict]:
         """Execute tools with policy checks and loop detection."""
+        if event_callback:
+            event_callback({
+                "type": "execution_step",
+                "step": 3,
+                "phase": "tool-call",
+                "agent": self.agent_id,
+                "action": f"Executing {len(task_spec.tools_needed)} requested tools...",
+                "duration": 0,
+                "status": "running"
+            })
+        
+        tools_start = time.time()
         results = []
         policy_ctx = PolicyContext(
             agent_id=self.agent_id,
@@ -575,6 +661,17 @@ class AgentController:
                         json.dumps({"tool": tool_name, "result": result}, default=str)[:500],
                         metadata={"tool_name": tool_name},
                     )
+
+        if event_callback:
+            event_callback({
+                "type": "execution_step",
+                "step": 3,
+                "phase": "tool-call",
+                "agent": self.agent_id,
+                "action": f"Completed {len(results)} tool executions.",
+                "duration": round((time.time() - tools_start) * 1000),
+                "status": "done"
+            })
 
         return results
 

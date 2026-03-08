@@ -1,0 +1,22 @@
+{
+  "3acb0462-d7f": {
+    "domain": "coding",
+    "reward": 0.8416366366366366,
+    "success": true,
+    "strategies": [
+      "decompose"
+    ],
+    "created_at": 1772895095.7095685,
+    "num_spans": 4
+  },
+  "06e5ee31-1a6": {
+    "domain": "algorithm",
+    "reward": 0.6866666666666668,
+    "success": false,
+    "strategies": [
+      "abstract"
+    ],
+    "created_at": 1772969801.2159765,
+    "num_spans": 3
+  }
+}

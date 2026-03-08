@@ -43,7 +43,10 @@ import {
   Copy,
   Terminal,
   Wrench,
-  Gamepad2
+  Gamepad2,
+  Flame,
+  BarChart3,
+  Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -51,6 +54,7 @@ import {
   scanFile, scanDirectory, scanUrl, getScanStats, getScanHistory,
   quarantineFile, destroyThreat, getMcpConfig, getMcpStatus, type McpStatus
 } from './api';
+import MarkdownRenderer from './MarkdownRenderer';
 
 // ── Slash Command Tools ────────────────────────────
 interface SlashTool {
@@ -95,33 +99,23 @@ const SLASH_TOOLS: SlashTool[] = [
   { id: 'threat_hunter', name: 'Threat Hunter', description: 'Proactive security threat hunting', category: 'agent', emoji: '🕵️' },
 ];
 
-const CustomLogo = ({ className = "w-6 h-6" }: { className?: string }) => {
-  const grid = [
-    ".....1111.......",
-    "....111111......",
-    "....111111......",
-    "....1111111.....",
-    "....111111......",
-    "....1...11......",
-    "....11..11......",
-    "....111111......",
-    "....111111.11...",
-    "....1111...11...",
-    "....11111..1....",
-    ".....111........",
-    "......111.......",
-    ".......111......",
-    ".......11.......",
-  ];
+// ── Token Tracking ──
+interface TokenRecord {
+  id: string;
+  timestamp: Date;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  provider: string;
+  model: string;
+  message: string;
+}
 
+const estimateTokens = (text: string): number => Math.max(1, Math.ceil(text.length / 4));
+
+const CustomLogo = ({ className = "w-6 h-6" }: { className?: string }) => {
   return (
-    <svg viewBox="0 0 16 15" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-      {grid.map((row, y) =>
-        row.split('').map((cell, x) =>
-          cell === '1' ? <rect key={`${x}-${y}`} x={x} y={y} width="1.05" height="1.05" /> : null
-        )
-      )}
-    </svg>
+    <img src="/logo.png" className={`${className} object-contain border-0`} alt="Astra Agent Logo" />
   );
 };
 
@@ -129,7 +123,11 @@ export default function Chat() {
   const [isSidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const [isPlusMenuOpen, setPlusMenuOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'account' | 'api' | 'mcp'>('account');
+  const [settingsTab, setSettingsTab] = useState<'account' | 'api' | 'mcp' | 'tokens'>('account');
+
+  // ── Token Tracking State ──
+  const [tokenRecords, setTokenRecords] = useState<TokenRecord[]>([]);
+  const [tokenBudget, setTokenBudget] = useState<number>(1000000); // 1M tokens default
 
   // ── MCP State ──
   const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
@@ -308,6 +306,18 @@ export default function Chat() {
 
     try {
       const res = await sendChat(userMessage);
+      const promptTk = estimateTokens(userMessage);
+      const completionTk = estimateTokens(res.answer);
+      setTokenRecords(prev => [{
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date(),
+        promptTokens: promptTk,
+        completionTokens: completionTk,
+        totalTokens: promptTk + completionTk,
+        provider: res.routed_to || activeModelName || 'unknown',
+        model: activeModelName || 'default',
+        message: rawInput.slice(0, 60),
+      }, ...prev].slice(0, 500));
       setMessages(prev => [...prev, {
         text: res.answer,
         isUser: false,
@@ -525,9 +535,7 @@ export default function Chat() {
                             </span>
                           </div>
                         )}
-                        <div className="whitespace-pre-wrap leading-relaxed">
-                          {msg.text}
-                        </div>
+                        <MarkdownRenderer content={msg.text} />
                       </div>
                     </div>
                   )}
@@ -800,6 +808,16 @@ export default function Chat() {
                     <Link2 className="w-4 h-4" />
                     MCP
                   </button>
+                  <button
+                    onClick={() => setSettingsTab('tokens')}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${settingsTab === 'tokens'
+                      ? 'bg-white/10 text-white'
+                      : 'text-white/60 hover:bg-white/5 hover:text-white'
+                      }`}
+                  >
+                    <Flame className="w-4 h-4" />
+                    Token Usage
+                  </button>
                 </div>
 
                 {/* Content */}
@@ -839,11 +857,11 @@ export default function Chat() {
 
                       <div className="space-y-4">
                         {[
-                          { name: 'OpenAI', placeholder: 'sk-proj-...', key: 'openai_api_key' as const, model: 'gpt-4o', color: 'text-green-400' },
-                          { name: 'Anthropic', placeholder: 'sk-ant-...', key: 'claude_api_key' as const, model: 'claude-sonnet-4-20250514', color: 'text-orange-400' },
-                          { name: 'Google Gemini', placeholder: 'AIzaSy...', key: 'gemini_api_key' as const, model: 'gemini-2.5-pro', color: 'text-blue-400' },
-                          { name: 'Grok (xAI)', placeholder: 'xai-...', key: 'grok_api_key' as const, model: 'grok-3', color: 'text-purple-400' },
-                          { name: 'OpenRouter', placeholder: 'sk-or-...', key: 'openrouter_api_key' as const, model: 'meta-llama/llama-4-maverick', color: 'text-cyan-400' }
+                          { name: 'OpenAI', placeholder: 'sk-proj-... (openai-5.4)', key: 'openai_api_key' as const, model: 'openai-5.4', color: 'text-green-400' },
+                          { name: 'Anthropic', placeholder: 'sk-ant-... (claude-opus-4.6)', key: 'claude_api_key' as const, model: 'claude-opus-4.6', color: 'text-orange-400' },
+                          { name: 'Google Gemini', placeholder: 'AIzaSy... (gemini-pro-3.1)', key: 'gemini_api_key' as const, model: 'gemini-pro-3.1', color: 'text-blue-400' },
+                          { name: 'Grok (xAI)', placeholder: 'xai-... (grok-4)', key: 'grok_api_key' as const, model: 'grok-4', color: 'text-purple-400' },
+                          { name: 'OpenRouter', placeholder: 'sk-or-... (openrouter)', key: 'openrouter_api_key' as const, model: 'meta-llama/llama-4-maverick', color: 'text-cyan-400' }
                         ].map((api, idx) => {
                           const liveProvider = providerList.find((p: any) => p.name === api.key.replace('_api_key', ''));
                           const isActive = liveProvider?.active;
@@ -859,13 +877,16 @@ export default function Chat() {
                                 </label>
                                 <span className={`text-[10px] font-mono ${api.color} opacity-60`}>{liveModel}</span>
                               </div>
-                              <input
-                                type="password"
-                                placeholder={api.placeholder}
-                                value={(apiKeys as any)[api.key] || ''}
-                                onChange={(e) => setApiKeys(prev => ({ ...prev, [api.key]: e.target.value }))}
-                                className="w-full bg-[#0a0a0a] border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-2.5 text-white placeholder-white/20 outline-none transition-colors"
-                              />
+                              <div className="relative">
+                                <input
+                                  type="password"
+                                  placeholder={api.placeholder}
+                                  value={(apiKeys as any)[api.key] || ''}
+                                  onChange={(e) => setApiKeys(prev => ({ ...prev, [api.key]: e.target.value }))}
+                                  className="w-full bg-[#0a0a0a] border border-white/10 focus:border-emerald-500/50 rounded-lg px-4 py-2.5 pr-28 text-white placeholder-white/20 outline-none transition-colors"
+                                />
+                                <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono ${api.color} opacity-40 pointer-events-none`}>{api.model}</span>
+                              </div>
                               {/* OpenRouter model selector */}
                               {api.key === 'openrouter_api_key' && (
                                 <div className="mt-1.5">
@@ -907,7 +928,7 @@ export default function Chat() {
                         </button>
                       </div>
                     </div>
-                  ) : (
+                  ) : settingsTab === 'mcp' ? (
                     /* MCP Tab */
                     <div className="space-y-6">
                       <div>
@@ -1036,6 +1057,187 @@ export default function Chat() {
                         </>
                       )}
                     </div>
+                  ) : (
+                    /* Token Usage Tab */
+                    (() => {
+                      const totalTokensUsed = tokenRecords.reduce((a, r) => a + r.totalTokens, 0);
+                      const totalPrompt = tokenRecords.reduce((a, r) => a + r.promptTokens, 0);
+                      const totalCompletion = tokenRecords.reduce((a, r) => a + r.completionTokens, 0);
+                      const burnPercent = Math.min(100, (totalTokensUsed / tokenBudget) * 100);
+                      const circumference = 2 * Math.PI * 45;
+                      const burnDash = circumference * (burnPercent / 100);
+
+                      // Provider breakdown
+                      const providerBreakdown: Record<string, { count: number; tokens: number }> = {};
+                      tokenRecords.forEach(r => {
+                        if (!providerBreakdown[r.provider]) providerBreakdown[r.provider] = { count: 0, tokens: 0 };
+                        providerBreakdown[r.provider].count++;
+                        providerBreakdown[r.provider].tokens += r.totalTokens;
+                      });
+
+                      return (
+                        <div className="space-y-6 flex flex-col h-full">
+                          <div>
+                            <h3 className="text-lg font-medium text-white mb-1 flex items-center gap-2">
+                              <Flame className="w-5 h-5 text-orange-400" />
+                              Token Usage
+                            </h3>
+                            <p className="text-sm text-white/50 mb-4">Monitor token consumption across all requests. Estimated at ~4 characters per token.</p>
+                          </div>
+
+                          {/* Summary Cards + Ring */}
+                          <div className="flex gap-4 items-center">
+                            {/* Ring Chart */}
+                            <div className="relative flex-shrink-0">
+                              <svg width="110" height="110" className="-rotate-90">
+                                <circle cx="55" cy="55" r="45" stroke="rgba(255,255,255,0.05)" strokeWidth="8" fill="none" />
+                                <circle
+                                  cx="55" cy="55" r="45"
+                                  stroke={burnPercent > 90 ? '#ef4444' : burnPercent > 70 ? '#f59e0b' : '#10b981'}
+                                  strokeWidth="8" fill="none"
+                                  strokeDasharray={`${burnDash} ${circumference - burnDash}`}
+                                  strokeLinecap="round"
+                                  style={{ transition: 'stroke-dasharray 0.5s ease, stroke 0.3s ease' }}
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <span className={`text-lg font-black ${burnPercent > 90 ? 'text-red-400' : burnPercent > 70 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                  {burnPercent.toFixed(1)}%
+                                </span>
+                                <span className="text-[9px] text-white/30 font-mono">BURNED</span>
+                              </div>
+                            </div>
+
+                            {/* Stats Grid */}
+                            <div className="flex-1 grid grid-cols-2 gap-2">
+                              <div className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border border-orange-500/15 rounded-xl p-3">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-orange-400/60 mb-1">Total Tokens</div>
+                                <div className="text-xl font-black text-orange-400 tabular-nums">{totalTokensUsed.toLocaleString()}</div>
+                              </div>
+                              <div className="bg-gradient-to-br from-violet-500/10 to-violet-500/5 border border-violet-500/15 rounded-xl p-3">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-violet-400/60 mb-1">Prompt</div>
+                                <div className="text-xl font-black text-violet-400 tabular-nums">{totalPrompt.toLocaleString()}</div>
+                              </div>
+                              <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/15 rounded-xl p-3">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-400/60 mb-1">Completion</div>
+                                <div className="text-xl font-black text-cyan-400 tabular-nums">{totalCompletion.toLocaleString()}</div>
+                              </div>
+                              <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/15 rounded-xl p-3">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/60 mb-1">Requests</div>
+                                <div className="text-xl font-black text-emerald-400 tabular-nums">{tokenRecords.length}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Budget Bar */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-bold uppercase tracking-wider text-white/40">Token Budget</label>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  value={tokenBudget}
+                                  onChange={e => setTokenBudget(Math.max(1000, Number(e.target.value)))}
+                                  className="w-28 bg-[#0a0a0a] border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-white/70 text-right outline-none focus:border-orange-500/40 transition-colors"
+                                />
+                                <span className="text-[10px] text-white/20">tokens</span>
+                              </div>
+                            </div>
+                            <div className="h-3 bg-white/5 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${burnPercent > 90 ? 'bg-gradient-to-r from-red-500 to-red-400' : burnPercent > 70 ? 'bg-gradient-to-r from-amber-500 to-amber-400' : 'bg-gradient-to-r from-emerald-500 to-emerald-400'}`}
+                                style={{ width: `${burnPercent}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-[10px] font-mono text-white/20">
+                              <span>{totalTokensUsed.toLocaleString()} used</span>
+                              <span>{(tokenBudget - totalTokensUsed).toLocaleString()} remaining</span>
+                            </div>
+                          </div>
+
+                          {/* Provider Breakdown & Request History flex container */}
+                          <div className="flex-1 flex flex-col gap-6 min-h-0">
+                            {/* Provider Breakdown */}
+                            {Object.keys(providerBreakdown).length > 0 && (
+                              <div className="space-y-2 flex-shrink-0">
+                                <label className="text-xs font-bold uppercase tracking-wider text-white/40">By Provider</label>
+                                <div className="space-y-1.5 max-h-[80px] overflow-y-auto custom-scrollbar">
+                                  {Object.entries(providerBreakdown).sort((a, b) => b[1].tokens - a[1].tokens).map(([provider, data]) => (
+                                    <div key={provider} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5">
+                                      <Zap className="w-3.5 h-3.5 text-amber-400/50 flex-shrink-0" />
+                                      <span className="text-[11px] font-bold text-white/60 w-32 truncate flex-shrink-0">{provider}</span>
+                                      <div className="flex-1 min-w-[50px] h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                        <div className="h-full bg-amber-500/40 rounded-full" style={{ width: `${(data.tokens / totalTokensUsed) * 100}%` }} />
+                                      </div>
+                                      <span className="text-[10px] font-mono text-white/30 w-16 text-right flex-shrink-0">{data.tokens.toLocaleString()} tk</span>
+                                      <span className="text-[10px] font-mono text-white/15 w-8 text-right flex-shrink-0">{data.count}×</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Per-Request History */}
+                            <div className="space-y-2 flex-1 min-h-0 flex flex-col pb-4">
+                              <div className="flex items-center justify-between flex-shrink-0">
+                                <label className="text-xs font-bold uppercase tracking-wider text-white/40">Request History</label>
+                                {tokenRecords.length > 0 && (
+                                  <button
+                                    onClick={() => setTokenRecords([])}
+                                    className="text-[10px] text-red-400/50 hover:text-red-400 transition-colors font-bold uppercase tracking-wider"
+                                  >
+                                    Clear All
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1 -mr-2 pr-2">
+                                {tokenRecords.length === 0 ? (
+                                  <div className="flex flex-col items-center justify-center py-8 text-white/15 h-full">
+                                    <Flame className="w-8 h-8 mb-3" />
+                                    <span className="text-sm">No tokens burned yet</span>
+                                    <span className="text-xs mt-1">Send a message to start tracking</span>
+                                  </div>
+                                ) : (
+                                  tokenRecords.map((record) => {
+                                    const maxTk = Math.max(...tokenRecords.map(r => r.totalTokens), 1);
+                                    const barWidth = Math.max(2, (record.totalTokens / maxTk) * 100);
+                                    return (
+                                      <div key={record.id} className="relative flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors group overflow-hidden">
+                                        {/* Background bar */}
+                                        <div
+                                          className="absolute left-0 top-0 h-full bg-gradient-to-r from-orange-500/[0.08] to-transparent transition-all"
+                                          style={{ width: `${barWidth}%` }}
+                                        />
+                                        {/* Content */}
+                                        <div className="relative flex items-center gap-3 w-full">
+                                          <div className="flex flex-col items-center w-12 flex-shrink-0">
+                                            <span className="text-[11px] font-black text-orange-400/80 tabular-nums">{record.totalTokens}</span>
+                                            <span className="text-[8px] text-white/15 font-mono">tokens</span>
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-[11px] text-white/60 truncate">{record.message || '(empty)'}</p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                              <span className="text-[9px] font-mono text-violet-400/40">{record.promptTokens} in</span>
+                                              <span className="text-[9px] text-white/10">→</span>
+                                              <span className="text-[9px] font-mono text-cyan-400/40">{record.completionTokens} out</span>
+                                            </div>
+                                          </div>
+                                          <div className="flex flex-col items-end flex-shrink-0">
+                                            <span className="text-[9px] font-mono text-white/20 max-w-[80px] truncate">{record.provider}</span>
+                                            <span className="text-[8px] font-mono text-white/10">{record.timestamp.toLocaleTimeString()}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()
                   )}
                 </div>
               </div>

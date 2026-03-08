@@ -133,22 +133,22 @@ class MultiProviderConfig:
     # Slot 1: Claude (Anthropic)
     claude_api_key: str = os.getenv("CLAUDE_API_KEY", "")
     claude_base_url: str = os.getenv("CLAUDE_BASE_URL", "https://api.anthropic.com/v1")
-    claude_model: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+    claude_model: str = os.getenv("CLAUDE_MODEL", "claude-opus-4.6")
 
     # Slot 2: Gemini (Google)
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_base_url: str = os.getenv("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-pro-preview-05-06")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-pro-3.1")
 
     # Slot 3: OpenAI
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_base_url: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o")
+    openai_model: str = os.getenv("OPENAI_MODEL", "openai-5.4")
 
     # Slot 4: Grok (xAI)
     grok_api_key: str = os.getenv("GROK_API_KEY", "")
     grok_base_url: str = os.getenv("GROK_BASE_URL", "https://api.x.ai/v1")
-    grok_model: str = os.getenv("GROK_MODEL", "grok-3")
+    grok_model: str = os.getenv("GROK_MODEL", "grok-4")
 
     # Slot 5: OpenRouter
     openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")

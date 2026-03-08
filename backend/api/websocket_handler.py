@@ -57,16 +57,82 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-async def _process_message(content: str, session_id: str) -> str:
-    """Process a message through the agent controller."""
+async def _process_stream(
+    websocket: WebSocket,
+    content: str,
+    session_id: str,
+):
+    """Process a message and stream live events back to the client."""
+    from api.server import state
+    loop = asyncio.get_running_loop()
+    event_queue = asyncio.Queue()
+
+    def sync_event_callback(event_data: dict):
+        """Thread-safe callback to push events into the async queue."""
+        loop.call_soon_threadsafe(event_queue.put_nowait, event_data)
+
+    async def _event_consumer():
+        while True:
+            event = await event_queue.get()
+            if event is None:  # Sentinel to stop
+                break
+            try:
+                await websocket.send_json(event)
+            except Exception as e:
+                logger.error(f"Failed to send event: {e}")
+
+    # Start consumer task
+    consumer_task = asyncio.create_task(_event_consumer())
+
+    start = time.time()
     try:
-        from agents.controller import AgentController
-        # This would use the actual controller in production
-        # For now, return a mock response that demonstrates the WebSocket flow
-        await asyncio.sleep(0.1)  # Simulate processing
-        return f"Processed: {content[:200]}"
+        if not state.is_ready:
+            raise Exception("System not ready")
+
+        # Ask AgentController to process in a background thread
+        result = await asyncio.to_thread(
+            state.agent_controller.process,
+            user_input=content,
+            use_thinking_loop=True,
+            session_id=session_id,
+            event_callback=sync_event_callback
+        )
+        
+        # Stream the final answer tokens
+        words = result.answer.split()
+        for i, word in enumerate(words):
+            await websocket.send_json({
+                "type": "token",
+                "content": word + " ",
+                "index": i + 1,
+            })
+            await asyncio.sleep(0.01)
+
+        # Send completion
+        duration_ms = (time.time() - start) * 1000
+        await websocket.send_json({
+            "type": "done",
+            "tokens": len(words),
+            "duration_ms": round(duration_ms, 1),
+            "session_id": session_id,
+        })
+
+        
     except Exception as e:
-        return f"Error processing message: {e}"
+        with open('C:/tmp/ws_trace.txt', 'a') as f: f.write(f"process_stream caught error: {e}\n")
+        logger.error(f"Stream processing error: {e}")
+        await websocket.send_json({"type": "error", "message": str(e)})
+    finally:
+        with open('C:/tmp/ws_trace.txt', 'a') as f: f.write("putting Sentinel in queue\n")
+        # Stop consumer
+        await event_queue.put(None)
+        with open('C:/tmp/ws_trace.txt', 'a') as f: f.write("awaiting consumer_task\n")
+        
+        try:
+            await consumer_task
+            with open('C:/tmp/ws_trace.txt', 'a') as f: f.write("consumer_task awaited successfully\n")
+        except Exception as e:
+            with open('C:/tmp/ws_trace.txt', 'a') as f: f.write(f"consumer_task raised exception: {e}\n")
 
 
 @router.websocket("/ws/chat")
@@ -115,27 +181,8 @@ async def websocket_chat(websocket: WebSocket):
                     "timestamp": start,
                 })
                 
-                # Process and stream response
-                response = await _process_message(content, session_id)
-                
-                # Stream token by token
-                words = response.split()
-                for i, word in enumerate(words):
-                    await websocket.send_json({
-                        "type": "token",
-                        "content": word + " ",
-                        "index": i + 1,
-                    })
-                    await asyncio.sleep(0.02)  # Small delay for streaming effect
-                
-                # Send completion
-                duration_ms = (time.time() - start) * 1000
-                await websocket.send_json({
-                    "type": "done",
-                    "tokens": len(words),
-                    "duration_ms": round(duration_ms, 1),
-                    "session_id": session_id,
-                })
+                # Process and stream response (including live agent events)
+                await _process_stream(websocket, content, session_id)
             else:
                 await websocket.send_json({
                     "type": "error",

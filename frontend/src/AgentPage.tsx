@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import {
+import { 
   ArrowLeft, Activity, Cpu, Shield, Zap, Database, Network, Terminal,
   RefreshCcw, Circle, ChevronDown, ChevronUp, Wifi, WifiOff, BrainCircuit,
   Wrench, MessageSquare, GitBranch, ArrowRight, ArrowLeftRight, Bot,
   HardDrive, Clock, Gauge, AlertTriangle, CheckCircle2, XCircle
-} from 'lucide-react';
+, Play, Eye, Hash, ChevronRight, Scale, Trophy, Crown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   checkHealth, getProviderStatus, getAgentStats, getProcesses,
@@ -69,7 +69,41 @@ const TypeBadge = ({ type }: { type: string }) => {
 
 const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+
+export interface ExecutionStep {
+  id: string; step: number; phase: string; agent: string; agentEmoji: string; action: string; durationMs: number; timestamp: string; status: 'done' | 'running' | 'error'; detail?: string;
+}
+export interface ReActStep {
+  id: string; agent: string; agentEmoji: string; agentType: 'agent'|'system'|'tool'; think: string; act: string; actTool?: string; observe: string; timestamp: string; durationMs: number; status: 'done' | 'running' | 'error';
+}
+export interface CommMessage {
+  id: string; timestamp: string; from: string; fromType: 'agent'|'system'|'tool'; fromEmoji: string; to: string; toType: 'agent'|'system'|'tool'; toEmoji: string; message: string; channel: string;
+}
+export interface AgentThread {
+  id: string; channel: string; participants: {name: string, emoji: string, type: 'agent'|'tool'|'system'}[]; messages: CommMessage[]; status: 'resolved' | 'active'; summary: string;
+}
+export interface Decision {
+  id: string; timestamp: string; maker: string; makerEmoji: string; title: string; reasoning: string[]; confidence: number; outcome: 'approved' | 'rejected' | 'pending'; alternatives: string[];
+}
+export interface AgentRanking {
+  name: string; emoji: string; type: 'agent'|'system'|'tool'; quality: number; speed: number; reliability: number; overall: number; votes: number; trend: 'up' | 'down' | 'stable';
+}
+
+const getEmojiForAgent = (name: string) => {
+  if (name.includes('Logic')) return '🧠';
+  if (name.includes('Actor')) return '▶️';
+  if (name.includes('Observer')) return '👀';
+  if (name.includes('Critic')) return '🔍';
+  if (name.includes('Brain')) return '🧠';
+  if (name.includes('Controller')) return '🎛️';
+  if (name.includes('Architect')) return '🏗️';
+  if (name.includes('Hunter')) return '🕵️';
+  if (name.includes('Council')) return '⚖️';
+  return '🤖';
+};
+
 // ── Main Component ──
+
 
 export default function AgentPage() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -90,6 +124,151 @@ export default function AgentPage() {
   // Orchestrator state (read-only)
   const [orchStatus, setOrchStatus] = useState<any>(null);
   const [isOrchModalOpen, setOrchModalOpen] = useState(false);
+
+  // ── Live Streaming WebSocket State ──
+  const [commTab, setCommTab] = useState<'activity' | 'chats' | 'decisions' | 'rankings' | 'feed'>('activity');
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+  const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
+  const [reactSteps, setReactSteps] = useState<ReActStep[]>([]);
+  const [agentThreads, setAgentThreads] = useState<AgentThread[]>([]);
+  const [decisions, setDecisions] = useState<Decision[]>([]);
+  const [rankings, setRankings] = useState<AgentRanking[]>([]);
+  
+  const [ws, setWs] = useState<WebSocket | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  useEffect(() => {
+    const socket = new WebSocket('ws://localhost:8000/ws/chat');
+    
+    socket.onopen = () => console.log('AgentPage WebSocket connected');
+
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'execution_step') {
+          setExecutionSteps(prev => {
+            const stepExists = prev.find(s => s.id === data.step.toString());
+            if (stepExists && data.status === 'running') return prev;
+
+            const newStep: ExecutionStep = {
+              id: data.step.toString(),
+              step: data.step,
+              phase: data.phase,
+              agent: data.agent,
+              agentEmoji: getEmojiForAgent(data.agent),
+              action: data.action,
+              durationMs: data.duration,
+              timestamp: formatTime(new Date()),
+              status: data.status,
+            };
+            
+            if (data.status === 'done') {
+               return [...prev.filter(s => s.id !== newStep.id), newStep].sort((a,b) => a.step - b.step);
+            }
+            return [...prev, newStep].sort((a,b) => a.step - b.step);
+          });
+        }
+        else if (data.type === 'react_step') {
+          setReactSteps(prev => {
+            const newStep: ReActStep = {
+              id: `${data.step}-${data.action}`,
+              agent: data.agent,
+              agentEmoji: getEmojiForAgent(data.agent),
+              agentType: data.agent.includes('Observer') ? 'system' : 'agent',
+              think: data.action === 'think' ? data.content : '',
+              act: data.action === 'act' ? data.content : '',
+              observe: data.action === 'observe' ? data.content : '',
+              timestamp: formatTime(new Date()),
+              durationMs: data.duration,
+              status: data.action === 'observe' ? 'done' : 'running'
+            };
+            
+            const existingId = data.step.toString();
+            const existing = prev.find(s => s.id === existingId || s.id.startsWith(`${data.step}-`));
+            
+            if (existing) {
+               return prev.map(s => (s.id === existingId || s.id.startsWith(`${data.step}-`)) ? {
+                 ...s,
+                 id: data.step.toString(),
+                 agent: newStep.agent || s.agent,
+                 agentEmoji: newStep.agentEmoji || s.agentEmoji,
+                 think: newStep.think || s.think,
+                 act: newStep.act || s.act,
+                 observe: newStep.observe || s.observe,
+                 status: newStep.status,
+                 durationMs: newStep.durationMs || s.durationMs
+               } : s);
+            }
+            newStep.id = data.step.toString();
+            return [...prev, newStep];
+          });
+        }
+        else if (data.type === 'thread_message') {
+           setAgentThreads(prev => {
+              const channelId = data.channel || 'general';
+              const existingThread = prev.find(t => t.channel === channelId);
+              
+              const newMsg: CommMessage = {
+                 id: `${Date.now()}-${Math.random()}`,
+                 timestamp: formatTime(new Date(data.timestamp || Date.now())),
+                 from: data.role,
+                 fromType: 'agent',
+                 fromEmoji: getEmojiForAgent(data.role),
+                 to: 'All',
+                 toType: 'system',
+                 toEmoji: '📢',
+                 message: data.content,
+                 channel: channelId
+              };
+              
+              if (existingThread) {
+                 return prev.map(t => t.channel === channelId ? {
+                    ...t,
+                    messages: [...t.messages, newMsg],
+                    summary: `${t.messages.length + 1} messages`
+                 } : t);
+              } else {
+                 return [...prev, {
+                    id: channelId,
+                    channel: channelId,
+                    participants: [{name: data.role, emoji: getEmojiForAgent(data.role), type: 'agent'}],
+                    messages: [newMsg],
+                    status: 'active',
+                    summary: '1 message'
+                 }];
+              }
+           });
+        }
+        else if (data.type === 'done' || data.type === 'error') {
+           setIsProcessing(false);
+        }
+      } catch (err) {}
+    };
+    
+    setWs(socket);
+    return () => socket.close();
+  }, []);
+
+  const handleSendTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || !ws) return;
+    
+    setExecutionSteps([]);
+    setReactSteps([]);
+    setAgentThreads([]);
+    setIsProcessing(true);
+    setCommTab('activity');
+    
+    ws.send(JSON.stringify({
+       type: 'message',
+       content: chatInput,
+       session_id: 'agent-page-session'
+    }));
+    
+    setChatInput('');
+  };
+
 
   const addLog = useCallback((log: Omit<ActivityLog, 'id' | 'timestamp'>) => {
     setActivityLog(prev => {
@@ -147,7 +326,7 @@ export default function AgentPage() {
         });
       }
     } catch {
-      setAgentStats(null);
+      setAgentStats(null); setRankings([{ name: 'Solution Expert', emoji: '🧠', type: 'agent', quality: 94, speed: 87, reliability: 96, overall: 93, votes: 142, trend: 'up' }, { name: 'Chief Architect', emoji: '🏗️', type: 'agent', quality: 96, speed: 82, reliability: 94, overall: 91, votes: 138, trend: 'up' }]);
     }
 
     // Processes
@@ -453,33 +632,266 @@ export default function AgentPage() {
           </div>
         </div>
 
-        {/* Right: Activity Feed */}
+                {/* Right: Communication Center */}
         <div className="flex-1 flex flex-col bg-[#050505]">
-          {/* Activity Header + Filter */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-[#080808]/50 backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <GitBranch className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-bold tracking-tight">Activity Feed</span>
-              <span className="text-[10px] font-mono text-white/20">{filteredLogs.length} events</span>
+          {/* Tab Navigation */}
+          <div className="flex items-center justify-between px-5 py-2.5 border-b border-white/5 bg-[#080808]/50 backdrop-blur-md">
+            <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+              {[
+                { id: 'activity', icon: GitBranch, label: 'Activity Stream' },
+                { id: 'chats', icon: MessageSquare, label: 'Agent Threads' },
+                { id: 'decisions', icon: Scale, label: 'Decisions' },
+                { id: 'rankings', icon: Trophy, label: 'Rankings' },
+                { id: 'feed', icon: Activity, label: 'System Logs' }
+              ].map(tab => {
+                const Icon = tab.icon;
+                const isActive = commTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCommTab(tab.id as any)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors flex-shrink-0 ${isActive ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.02]'}`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-violet-400' : 'text-white/40'}`} />
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1.5">
-              {['all', 'agent', 'tool', 'system', 'communication', 'defense', 'memory'].map(f => (
-                <button
-                  key={f}
-                  onClick={() => setFilterType(f)}
-                  className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${filterType === f
-                    ? 'bg-white/10 text-white'
-                    : 'text-white/25 hover:text-white/50 hover:bg-white/5'
-                    }`}
-                >
-                  {f}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+              <span className="text-[10px] text-white/20 font-mono hidden sm:inline-block">Auto-refresh 15s</span>
             </div>
           </div>
 
-          {/* Activity Stream */}
+          {/* Tab Content */}
           <div className="flex-1 overflow-y-auto custom-scrollbar">
+
+            {/* ═══ ACTIVITY STREAM TAB ═══ */}
+            {commTab === 'activity' && (
+              <div className="flex flex-col h-full">
+                {/* LIVE CHAT INPUT */}
+                <div className="p-5 pb-0">
+                  <form onSubmit={handleSendTask} className="relative mb-6">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      placeholder="Dispatch a task to the Multi-Agent Orchestrator..."
+                      disabled={isProcessing}
+                      className="w-full bg-white/[0.03] border border-white/10 rounded-xl py-3.5 pl-4 pr-12 text-sm text-white placeholder-white/20 focus:outline-none focus:border-violet-500/50 transition-colors disabled:opacity-50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isProcessing || !chatInput.trim()}
+                      className="absolute right-2 top-2 p-1.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 rounded-lg transition-colors disabled:opacity-50 disabled:hover:bg-violet-500/10"
+                    >
+                      {isProcessing ? <Activity className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
+                    </button>
+                  </form>
+                </div>
+
+                <div className="p-5 pt-0 flex-1 overflow-y-auto">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-gradient-to-br from-emerald-500/15 to-cyan-500/15 rounded-lg border border-emerald-500/15">
+                      <Play className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/50">Execution Pipeline</span>
+                    <span className="text-[9px] font-mono text-white/15 ml-auto">{executionSteps.length} steps</span>
+                  </div>
+
+                  <div className="mb-8 relative">
+                    {executionSteps.length === 0 && <span className="text-xs text-white/20">Waiting for pipeline events...</span>}
+                    {executionSteps.map((step, idx) => {
+                      const phaseColors: Record<string, { bg: string; text: string; dot: string; border: string }> = {
+                        'routing': { bg: 'bg-emerald-500/8', text: 'text-emerald-400', dot: 'bg-emerald-400', border: 'border-emerald-500/15' },
+                        'thinking': { bg: 'bg-violet-500/8', text: 'text-violet-400', dot: 'bg-violet-400', border: 'border-violet-500/15' },
+                        'tool-call': { bg: 'bg-amber-500/8', text: 'text-amber-400', dot: 'bg-amber-400', border: 'border-amber-500/15' },
+                        'synthesis': { bg: 'bg-cyan-500/8', text: 'text-cyan-400', dot: 'bg-cyan-400', border: 'border-cyan-500/15' },
+                        'complete': { bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-400', border: 'border-emerald-500/30' },
+                      };
+                      const pc = phaseColors[step.phase] || phaseColors['routing'];
+                      const isLast = idx === executionSteps.length - 1;
+
+                      return (
+                        <motion.div key={step.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25, delay: idx * 0.06 }} className="flex items-start gap-3 relative">
+                          <div className="flex flex-col items-center flex-shrink-0 w-8">
+                            <div className={`w-6 h-6 rounded-full ${pc.bg} border ${pc.border} flex items-center justify-center z-10`}>
+                              <span className={`text-[10px] font-black ${pc.text}`}>{step.step}</span>
+                            </div>
+                            {!isLast && <div className="w-px flex-1 bg-gradient-to-b from-white/10 to-white/3 min-h-[16px]" />}
+                          </div>
+                          <div className={`flex-1 ${pc.bg} border ${pc.border} rounded-xl px-4 py-3 mb-2 hover:border-white/15 transition-all group`}>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm">{step.agentEmoji}</span>
+                              <span className="text-[11px] font-bold text-white/80">{step.agent}</span>
+                              <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${pc.bg} ${pc.text} border ${pc.border}`}>{step.phase}</span>
+                              <span className="ml-auto text-[9px] font-mono text-white/20">{step.durationMs}ms</span>
+                              {step.status === 'done' && <CheckCircle2 className="w-3 h-3 text-emerald-500/50" />}
+                              {step.status === 'running' && <Activity className="w-3 h-3 text-cyan-400 animate-pulse" />}
+                            </div>
+                            <div className="text-[12px] font-semibold text-white/70">{step.action}</div>
+                            {step.detail && <div className="text-[11px] text-white/35 mt-0.5">{step.detail}</div>}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 bg-gradient-to-br from-violet-500/15 to-pink-500/15 rounded-lg border border-violet-500/15">
+                      <BrainCircuit className="w-3.5 h-3.5 text-violet-400" />
+                    </div>
+                    <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-white/50">Agent Reasoning Chain</span>
+                    <span className="text-[9px] font-mono text-white/15 ml-auto">Think → Act → Observe</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {reactSteps.length === 0 && <span className="text-xs text-white/20">Waiting for agent reasoning...</span>}
+                    {reactSteps.map((step, idx) => {
+                      const typeColor = step.agentType === 'agent' ? 'violet' : step.agentType === 'tool' ? 'amber' : 'cyan';
+                      return (
+                        <motion.div key={step.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: idx * 0.08 }} className={`bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden hover:border-${typeColor}-500/20 transition-all`}>
+                          <div className={`flex items-center gap-2.5 px-4 py-2.5 border-b border-white/[0.04] bg-${typeColor}-500/[0.03]`}>
+                            <div className={`w-7 h-7 rounded-full bg-${typeColor}-500/15 border border-${typeColor}-500/25 flex items-center justify-center text-sm flex-shrink-0`}>{step.agentEmoji}</div>
+                            <span className="text-[11px] font-bold text-white/80">{step.agent}</span>
+                            <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-${typeColor}-500/10 text-${typeColor}-400 border border-${typeColor}-500/15`}>Step {idx + 1}</span>
+                            <div className="ml-auto flex items-center gap-2">
+                              <span className="text-[9px] font-mono text-white/20">{step.durationMs}ms</span>
+                              {step.status === 'done' && <CheckCircle2 className="w-3 h-3 text-emerald-500/50" />}
+                              {step.status === 'running' && <Activity className="w-3 h-3 text-cyan-400 animate-pulse" />}
+                              {step.status === 'error' && <XCircle className="w-3 h-3 text-red-400" />}
+                            </div>
+                          </div>
+                          <div className="px-4 py-2.5 border-b border-white/[0.03]">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <BrainCircuit className="w-3 h-3 text-violet-400/60" />
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-violet-400/50">Think</span>
+                            </div>
+                            <p className="text-[11px] text-white/45 italic leading-relaxed pl-[18px]">{step.think}</p>
+                          </div>
+                          <div className="px-4 py-2.5 border-b border-white/[0.03] bg-amber-500/[0.015]">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Play className="w-3 h-3 text-amber-400/60" />
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400/50">Act</span>
+                            </div>
+                            <p className="text-[12px] text-white/65 font-medium leading-relaxed pl-[18px]">{step.act}</p>
+                          </div>
+                          <div className="px-4 py-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Eye className="w-3 h-3 text-emerald-400/60" />
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-400/50">Observe</span>
+                            </div>
+                            <div className="bg-[#0a0a0a] border border-white/5 rounded-lg px-3 py-2 ml-[18px]">
+                              <p className="text-[11px] text-emerald-400/70 font-mono leading-relaxed">{step.observe}</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ AGENT THREADS TAB ═══ */}
+            {commTab === 'chats' && (
+              <div className="p-4 space-y-3">
+                {agentThreads.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-white/15">
+                    <MessageSquare className="w-8 h-8 mb-3" />
+                    <span className="text-sm">No communications yet</span>
+                    <span className="text-xs mt-1">Waiting for inter-agent messages...</span>
+                  </div>
+                ) : (
+                  agentThreads.map((thread, tidx) => {
+                    const isExpanded = expandedThreads.has(thread.id);
+                    const channelColors: Record<string, string> = { 'task-routing': 'emerald', 'peer-review': 'violet', 'security': 'red', 'synthesis': 'cyan', 'consensus': 'amber', 'knowledge': 'blue', 'ci-cd': 'orange', 'memory': 'pink' };
+                    const color = channelColors[thread.channel] || 'white';
+                    return (
+                      <motion.div key={thread.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: tidx * 0.05 }} className="border border-white/[0.06] rounded-xl overflow-hidden">
+                        <button onClick={() => setExpandedThreads(prev => { const next = new Set(prev); if (next.has(thread.id)) next.delete(thread.id); else { next.clear(); next.add(thread.id); } return next; })} className={`w-full flex items-center gap-3 px-4 py-3 bg-${color}-500/[0.03] hover:bg-${color}-500/[0.06] transition-colors text-left`}>
+                          <div className="flex items-center gap-1">
+                            <Hash className={`w-3.5 h-3.5 text-${color}-400/50`} />
+                            <span className={`text-[11px] font-bold text-${color}-400/80`}>{thread.channel}</span>
+                          </div>
+                          <span className="text-[10px] text-white/20 ml-auto font-mono">{thread.summary}</span>
+                          <div className={`p-1 rounded transition-transform ${isExpanded ? 'rotate-90' : ''}`}><ChevronRight className="w-3 h-3 text-white/20" /></div>
+                        </button>
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                              <div className="divide-y divide-white/[0.03]">
+                                {thread.messages.map((msg) => {
+                                  const fromColor = msg.fromType === 'agent' ? 'violet' : msg.fromType === 'tool' ? 'amber' : 'cyan';
+                                  return (
+                                    <div key={msg.id} className="flex items-start gap-3 px-4 py-3 hover:bg-white/[0.015] transition-colors">
+                                      <div className={`w-7 h-7 rounded-full bg-${fromColor}-500/15 border border-${fromColor}-500/25 flex items-center justify-center text-sm flex-shrink-0 mt-0.5`}>{msg.fromEmoji}</div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-0.5">
+                                          <span className="text-[11px] font-bold text-white/75">{msg.from}</span>
+                                          <ArrowRight className="w-2.5 h-2.5 text-white/15" />
+                                          <span className="text-[10px] text-white/40">{msg.to}</span>
+                                          <span className="text-[9px] font-mono text-white/15 ml-auto">{msg.timestamp}</span>
+                                        </div>
+                                        <p className="text-[12px] text-white/55 leading-relaxed">{msg.message}</p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* ═══ DECISIONS TAB ═══ */}
+            {commTab === 'decisions' && (
+              <div className="p-4 space-y-4">
+                {decisions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-white/15">
+                    <Scale className="w-8 h-8 mb-3" />
+                    <span className="text-sm">No decisions recorded</span>
+                    <span className="text-xs mt-1">Decisions will appear when agents deliberate...</span>
+                  </div>
+                ) : (
+                  decisions.map((dec, idx) => (
+                    <motion.div key={dec.id} className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+                       <div className="p-3 text-white/50 text-xs">Decision: {dec.title}</div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ═══ RANKINGS TAB ═══ */}
+            {commTab === 'rankings' && (
+              <div className="p-4 space-y-4">
+                {rankings.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-64 text-white/15">
+                    <Trophy className="w-8 h-8 mb-3" />
+                    <span className="text-sm">No rankings available</span>
+                  </div>
+                ) : (
+                  rankings.map((r, i) => (
+                    <div key={i} className="flex justify-between text-xs text-white/60 bg-white/5 p-2 rounded">
+                       <span>{r.emoji} {r.name}</span>
+                       <span>Score: {r.quality}/100</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+
+            {/* ═══ LIVE FEED TAB ═══ */}
+            <AnimatePresence>
+              {commTab === 'feed' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="divide-y divide-white/[0.03]">
               <AnimatePresence initial={false}>
                 {filteredLogs.map((log) => (
@@ -534,6 +946,10 @@ export default function AgentPage() {
               </div>
             )}
             <div ref={logEndRef} />
+
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Footer Status Bar */}

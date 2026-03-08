@@ -25,7 +25,7 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks, Cookie, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -174,12 +174,36 @@ async def lifespan(app: FastAPI):
         except ImportError:
             pass
 
-        if registry:
-            generate_fn = registry.generate_fn()
-            state.agent_controller = AgentController(generate_fn=generate_fn)
-            logger.info("✅ Agent controller ready")
+        if not registry:
+            from core.model_providers import ProviderRegistry
+            registry = ProviderRegistry.auto_detect()
+            logger.info("Auto-detected Provider Registry in server process.")
+
+        if registry and registry.active:
+            try:
+                generate_fn = registry.generate_fn()
+                state.agent_controller = AgentController(generate_fn=generate_fn)
+                logger.info("✅ Agent controller ready (Active Provider)")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to create AgentController with registry: {e}")
         else:
-            logger.warning("⚠️ No LLM Registry found on startup.")
+            logger.warning("⚠️ No active LLM Provider found. Using Mock Generator for UI Testing.")
+            def mock_generate(prompt: str, **kwargs) -> str:
+                import time
+                time.sleep(0.5)
+                if "TaskSpec" in prompt or "extract" in prompt.lower() or "JSON" in prompt:
+                    return '{"action_type": "general", "tools_needed": [], "goal": "Demonstrate the UI", "requires_sandbox": false}'
+                if "Reasoning chain" in prompt or "hypothesis" in prompt.lower():
+                    return "Hypothesis: By mocking the generator, we can validate the React UI logic."
+                if "Verify" in prompt or "verification" in prompt.lower():
+                    return '{"passed": true, "confidence": 0.95, "v_static": 1.0, "v_property": 1.0, "v_scenario": 1.0, "v_critic": 1.0, "v_code": 1.0, "v_security": 1.0, "critic_details": "Looks good."}'
+                return "This is a simulated response. Processing complete! Fibonacci: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34."
+            
+            try:
+                state.agent_controller = AgentController(generate_fn=mock_generate)
+                logger.info("✅ Agent controller ready (Mock Provider)")
+            except Exception as e:
+                logger.error(f"⚠️ Failed to create AgentController with mock: {e}")
 
         state.is_ready = True
         logger.info("=" * 60)

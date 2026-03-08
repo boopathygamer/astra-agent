@@ -27,6 +27,7 @@ from brain.reward_model import RewardComputer, CompositeReward
 from brain.credit_assignment import CreditAssignmentEngine, CreditReport
 from brain.prompt_evolver import PromptEvolver
 from brain.epistemic_checker import EpistemicChecker
+from brain.super_intelligence import SuperIntelligenceEngine
 
 from telemetry.metrics import MetricsCollector
 from telemetry.tracer import SpanTracer
@@ -163,6 +164,9 @@ class ThinkingLoop:
         
         # Phase 12: Epistemic Fact Checking
         self.epistemic_checker = EpistemicChecker(generate_fn)
+        
+        # Phase 13: Mathematical Super Intelligence
+        self.super_intelligence = SuperIntelligenceEngine()
 
         # ── EXPERT TELEMETRY ──
         self.tracer = SpanTracer()
@@ -184,6 +188,7 @@ class ThinkingLoop:
         max_iterations: Optional[int] = None,
         execute_fn: Optional[Callable] = None,
         sandbox_fn: Optional[Callable] = None,
+        event_callback: Optional[Callable[[dict], None]] = None,
     ) -> ThinkingResult:
         """
         Run the complete Synthesize → Verify → Learn loop.
@@ -225,10 +230,15 @@ class ThinkingLoop:
             attributes={"strategy": strategy.summary()},
         ))
 
-        # Phase 2: Estimate cognitive load + set iterations
+        # Phase 2: Estimate cognitive load + set iterations via Super Intelligence Math Layer
         load = self.metacognition.estimate_cognitive_load(problem)
-        max_iter = max_iterations or strategy.suggested_iterations
-        logger.info(f"Cognitive load: {load:.2f} | Max iterations: {max_iter}")
+        base_iter = max_iterations or strategy.suggested_iterations
+        max_iter = self.super_intelligence.compute_thought_depth(
+            current_depth=base_iter,
+            information_gain=load,  # proxy for observation mutual information
+            computation_cost=0.1
+        )
+        logger.info(f"Cognitive load: {load:.2f} | Dynamic Thought Depth (Max iterations): {max_iter}")
 
         # Phase 3: Build memory context
         memory_context = self.memory.build_context(problem)
@@ -287,6 +297,17 @@ class ThinkingLoop:
             step.strategy_used = current_mode.value
             step.reasoning_trace = reasoning_trace
 
+            if event_callback:
+                think_preview = reasoning_trace.final_answer[:1000] if reasoning_trace and reasoning_trace.final_answer else "Analyzing problem context and formulating hypotheses..."
+                event_callback({
+                    "type": "react_step",
+                    "step": iteration + 1,
+                    "agent": "Logic Engine",
+                    "action": "think",
+                    "content": think_preview,
+                    "duration": 0
+                })
+
             # SYNTHESIZE: Get best candidate from hypothesis mixture
             step.candidate = self.hypothesis_engine.synthesize_candidate(
                 synthesize_fn=self.generate_fn,
@@ -322,9 +343,25 @@ class ThinkingLoop:
             # Track improvement
             step.confidence_delta = step.verification.confidence - prev_confidence
             step.improved = step.confidence_delta > 0
+            
+            # SUPER INTELLIGENCE: Track KL Divergence of the self-model
+            divergence = self.super_intelligence.track_self_model_divergence(
+                predicted_confidence=prev_confidence if prev_confidence > 0 else 0.5,
+                actual_success=(step.verification.confidence > 0.8)
+            )
 
             # GATE: Decide action mode
             mode = step.risk_assessment.mode
+
+            if event_callback:
+                event_callback({
+                    "type": "react_step",
+                    "step": iteration + 1,
+                    "agent": "Actor",
+                    "action": "act",
+                    "content": step.candidate[:1000],
+                    "duration": 0
+                })
 
             if mode == GatingMode.EXECUTE:
                 step.action_taken = "execute"
@@ -343,6 +380,16 @@ class ThinkingLoop:
                     result=step.result[:500],
                     confidence=step.verification.confidence,
                 ))
+                
+                if event_callback:
+                    event_callback({
+                        "type": "react_step",
+                        "step": iteration + 1,
+                        "agent": "Observer",
+                        "action": "observe",
+                        "content": f"[SUCCESS] Conf: {step.verification.confidence:.2f}\n{step.result[:800]}",
+                        "duration": step.duration_ms
+                    })
 
                 # Deep Expert Reflection (Success -> Principle)
                 principle = self.expert_reflection.extract_first_principle(
@@ -367,6 +414,17 @@ class ThinkingLoop:
                     reward=comp_reward.primary_reward,
                     attributes={"dimensions": comp_reward.to_dict()},
                 ))
+                
+                # SUPER INTELLIGENCE: Close the mathematical loop and evolve gradients!
+                import numpy as np
+                surpass_score = self.super_intelligence.evaluate_human_surpass_objective(
+                    domain.value, step.verification.confidence
+                )
+                
+                grad_J = np.array([0.1 * surpass_score, 0.0, 0.05, 0.0])
+                grad_M = np.array([0.0, 0.1 * max(0, 1.0 - divergence), 0.0, 0.01])
+                
+                self.super_intelligence.update_parameters(grad_J, grad_M)
 
                 result.final_answer = step.result
                 result.final_confidence = step.verification.confidence
@@ -380,11 +438,32 @@ class ThinkingLoop:
                 else:
                     step.result = step.candidate
                 step.duration_ms = (time.time() - step_start) * 1000
+                
+                if event_callback:
+                    event_callback({
+                        "type": "react_step",
+                        "step": iteration + 1,
+                        "agent": "Observer",
+                        "action": "observe",
+                        "content": f"[SANDBOXED] Conf: {step.verification.confidence:.2f}\n{step.result[:800]}",
+                        "duration": step.duration_ms
+                    })
+                    
                 result.steps.append(step)
 
                 result.final_answer = step.result
                 result.final_confidence = step.verification.confidence
                 result.mode = GatingMode.SANDBOX
+                
+                # SUPER INTELLIGENCE: Evolve gradients on sandbox success as well!
+                import numpy as np
+                surpass_score = self.super_intelligence.evaluate_human_surpass_objective(
+                    domain.value, step.verification.confidence
+                )
+                grad_J = np.array([0.05 * surpass_score, 0.0, 0.02, 0.0])
+                grad_M = np.array([0.0, 0.1 * max(0, 1.0 - divergence), 0.0, 0.01])
+                self.super_intelligence.update_parameters(grad_J, grad_M)
+                
                 break
 
             else:
@@ -404,6 +483,24 @@ class ThinkingLoop:
                     failed_candidate=step.candidate,
                     verifier_feedback=str_feedback
                 )
+                
+                if event_callback:
+                    event_callback({
+                        "type": "thread_message",
+                        "thread_id": "review-board",
+                        "channel": "#peer-review",
+                        "role": "Critic Agent",
+                        "content": f"I've analyzed iteration {iteration + 1}. The logic is flawed. Root cause: {root_cause}",
+                        "timestamp": time.time() * 1000
+                    })
+                    event_callback({
+                        "type": "react_step",
+                        "step": iteration + 1,
+                        "agent": "Observer",
+                        "action": "observe",
+                        "content": f"[CRITIQUE] Conf: {step.verification.confidence:.2f}\n{root_cause}\nRefining hypothesis...",
+                        "duration": round((time.time() - step_start) * 1000)
+                    })
 
                 # ── AUTO-GAP DETECTION ──
                 # Check if failure is due to missing tools/capabilities
