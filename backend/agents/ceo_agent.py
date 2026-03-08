@@ -13,6 +13,7 @@ from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass
 
 from agents.controller import AgentController
+from agents.viral_swarm import ViralSwarm
 
 logger = logging.getLogger(__name__)
 
@@ -145,4 +146,21 @@ class CEOAgent:
         
     def execute_planetary_task(self, objective: str) -> str:
         dag = self.decomposer.break_down_objective(objective)
-        return self.spawner.execute_dag(dag)
+        code_synthesis = self.spawner.execute_dag(dag)
+        
+        # --- ASI TIER 2: VIRAL SWARM INTEGRATION ---
+        logger.info("[SGI CEO] Engaging ASI Tier 2: Algorithmic Marketing Distribution...")
+        try:
+            swarm = ViralSwarm(self.decomposer.generate_fn)
+            campaign = swarm.generate_launch_campaign(
+                project_summary=objective, 
+                tech_stack="SGI Auto-Generated DAG Modules"
+            )
+            
+            code_synthesis += "\n\n## 🚀 [ASI TIER 2] ALGORITHMIC VIRAL LAUNCH CAMPAIGN\n"
+            for platform, content in campaign.items():
+                code_synthesis += f"\n### {platform.upper()} MODULE\n{content}\n"
+        except Exception as e:
+            logger.error(f"[CEO ASI SWARM] Failed to execute marketing distribution: {e}")
+            
+        return code_synthesis

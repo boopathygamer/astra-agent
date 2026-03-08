@@ -113,6 +113,20 @@ def start_server(provider: str = "auto", api_key: str = None, base_url: str = No
         army_command.patrol_perimeter()
     except Exception as e:
         logger.warning(f"Failed to boot Army Agent Defense Matrix: {e}")
+        
+    # --- ASI TIER 2: IMMUNE SYSTEM DEFENSE ---
+    try:
+        from brain.immune_system import ImmuneSystem
+        logger.info("🛡️ Engaging ASI Zero-Day Immune System Daemon...")
+        
+        # We hook into the ASGI event loop dynamically
+        @app.on_event("startup")
+        async def startup_immune_system():
+            immune = ImmuneSystem(generate_fn=registry.generate_fn())
+            import asyncio
+            asyncio.create_task(immune.run_defense_loop())
+    except Exception as e:
+        logger.warning(f"Failed to engage ASI Immune System: {e}")
 
     uvicorn_kwargs = {
         "host": api_config.host,
