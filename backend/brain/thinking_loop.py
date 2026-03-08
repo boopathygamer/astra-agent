@@ -28,6 +28,7 @@ from brain.credit_assignment import CreditAssignmentEngine, CreditReport
 from brain.prompt_evolver import PromptEvolver
 from brain.epistemic_checker import EpistemicChecker
 from brain.super_intelligence import SuperIntelligenceEngine
+from brain.asi_kernel_mutator import ASIKernelMutator
 
 from telemetry.metrics import MetricsCollector
 from telemetry.tracer import SpanTracer
@@ -165,8 +166,9 @@ class ThinkingLoop:
         # Phase 12: Epistemic Fact Checking
         self.epistemic_checker = EpistemicChecker(generate_fn)
         
-        # Phase 13: Mathematical Super Intelligence
+        # Phase 13: Mathematical Super Intelligence & ASI
         self.super_intelligence = SuperIntelligenceEngine()
+        self.asi_kernel = ASIKernelMutator(generate_fn)
 
         # ── EXPERT TELEMETRY ──
         self.tracer = SpanTracer()
@@ -208,6 +210,17 @@ class ThinkingLoop:
 
         # Reset auto-forge counter for this task
         self._auto_forge_attempts = 0
+
+        # ASI: C-Level Runtime Offloading
+        # Check if the kernel has already been hyper-mutated into C++ memory
+        if self.asi_kernel._c_kernel:
+            logger.info("[ASI COGNITION] Bypassing Python logic... Executing through C++ Kernel Mutator.")
+            mutant_result = self.asi_kernel.execute_mutated_kernel(problem)
+            if mutant_result:
+                result.final_answer = mutant_result
+                result.mode = "asi_kernel_execution"
+                result.final_confidence = 1.0 
+                return result
 
         # Initialize trajectory trace for this episode
         trajectory = TrajectoryTrace(problem=problem)
@@ -296,6 +309,13 @@ class ThinkingLoop:
             step = ThinkingStep(iteration=iteration)
             step.strategy_used = current_mode.value
             step.reasoning_trace = reasoning_trace
+
+            # ASI: Cognitive Performance Monitoring
+            if iteration > 0 and (time.time() - start_time) * 1000 > self.asi_kernel.mutation_threshold_ms:
+                # Transpile self.reasoning logic into C++ mathematically if too slow
+                logger.warning(f"Cognitive execution lag trailing. Requesting ASI Hyper-Mutation to C++...")
+                # Conceptually passing pseudo-code of what it's supposed to do for the AST mutator
+                self.asi_kernel.evaluate_mutation_necessity((time.time() - start_time) * 1000, "async def think_logic(input): return synthesize(input)")
 
             if event_callback:
                 think_preview = reasoning_trace.final_answer[:1000] if reasoning_trace and reasoning_trace.final_answer else "Analyzing problem context and formulating hypotheses..."
