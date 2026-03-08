@@ -327,6 +327,24 @@ class AgentController:
 
             route_span.attributes["primary_domain"] = domain_match.primary_domain
             route_span.attributes["persona"] = persona.name
+            
+        # ── SGI CEO INTERCEPTION ──
+        if domain_match.primary_domain == "sgi_ceo":
+            from agents.ceo_agent import CEOAgent
+            logger.info("Universal Router: Planetary SGI task detected. Escalating to CEO Agent orchestrator.")
+            ceo = CEOAgent(self.generate_fn, self.tools, event_callback)
+            dag_result = ceo.execute_planetary_task(user_input)
+            
+            response.answer = dag_result
+            response.confidence = 1.0
+            response.mode = "sgi_ceo_executed"
+            response.duration_ms = (time.time() - start_time) * 1000
+            
+            self.session_manager.add_message(
+                active_session, "assistant", response.answer,
+                metadata={"mode": "sgi_ceo", "confidence": 1.0},
+            )
+            return response
         
         # FEATURE 1: Dynamic Domain Generation
         # If confidence is 0.0 (no match), generate a dynamic expert context on the fly

@@ -30,18 +30,21 @@ try:
 except ImportError:
     CodeAnalyzer = None
 
+from brain.neuro_symbolic_verifier import NeuroSymbolicVerifier
+
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class VerificationReport:
-    """Complete verification report with all 6 layer scores."""
+    """Complete verification report with all 7 layer scores."""
     v_static: float = 0.0      # Layer 1: Static checks [0, 1]
     v_property: float = 0.0    # Layer 2: Property tests [0, 1]
     v_scenario: float = 0.0    # Layer 3: Scenario tests [0, 1]
     v_critic: float = 0.0      # Layer 4: Critic review [0, 1]
     v_code: float = 0.0        # Layer 5: Code analysis [0, 1]
     v_security: float = 0.0    # Layer 6: Security audit [0, 1]
+    v_symbolic: float = 0.0    # Layer 7: Neuro-Symbolic Proof [0, 1]
 
     static_details: list = field(default_factory=list)
     property_details: list = field(default_factory=list)
@@ -49,6 +52,7 @@ class VerificationReport:
     critic_details: str = ""
     code_details: dict = field(default_factory=dict)
     security_details: list = field(default_factory=list)
+    symbolic_details: str = ""
 
     confidence: float = 0.0
     passed: bool = False
@@ -62,6 +66,7 @@ class VerificationReport:
             "v_critic": self.v_critic,
             "v_code": self.v_code,
             "v_security": self.v_security,
+            "v_symbolic": self.v_symbolic,
             "confidence": self.confidence,
             "passed": self.passed,
             "has_critical_vulns": self.has_critical_vulns,
@@ -77,7 +82,8 @@ class VerificationReport:
             f"  Scenario: {self.v_scenario:.2f}\n"
             f"  Critic:   {self.v_critic:.2f}\n"
             f"  Code:     {self.v_code:.2f}\n"
-            f"  Security: {self.v_security:.2f}"
+            f"  Security: {self.v_security:.2f}\n"
+            f"  Symbolic: {self.v_symbolic:.2f}"
         )
 
 
@@ -97,7 +103,7 @@ class VerifierStack:
     def __init__(self, config=None):
         self.config = config or brain_config
 
-        # Calibration weights α — learnable over time (6 layers)
+        # Calibration weights α — learnable over time (7 layers)
         self.alpha = {
             "static": 1.0,
             "property": 1.5,
@@ -105,6 +111,7 @@ class VerifierStack:
             "critic": 1.8,
             "code": 2.2,
             "security": 2.5,
+            "symbolic": 3.0,
         }
 
         # Code analyzer for Layers 5-6
@@ -164,7 +171,19 @@ class VerifierStack:
             candidate
         )
 
-        # Calculate confidence: Conf(s) = σ(α^T · v(s)) with 6 layers
+        # Layer 7: Neuro-Symbolic Proof (SGI Mathematical Bounds)
+        extracted_code = NeuroSymbolicVerifier.extract_clean_code(candidate)
+        if any(kw in extracted_code for kw in ["def ", "class ", "import "]):
+            proof_result = NeuroSymbolicVerifier.formally_prove(extracted_code)
+            report.v_symbolic = 1.0 if proof_result.is_safe else 0.0
+            report.symbolic_details = proof_result.summary()
+            if not proof_result.is_safe:
+                report.has_critical_vulns = True
+        else:
+            report.v_symbolic = 1.0
+            report.symbolic_details = "SAFE: No translatable AST execution paths detected."
+
+        # Calculate confidence: Conf(s) = σ(α^T · v(s)) with 7 layers
         raw_score = (
             self.alpha["static"] * report.v_static
             + self.alpha["property"] * report.v_property
@@ -172,6 +191,7 @@ class VerifierStack:
             + self.alpha["critic"] * report.v_critic
             + self.alpha["code"] * report.v_code
             + self.alpha["security"] * report.v_security
+            + self.alpha["symbolic"] * report.v_symbolic
         )
         report.confidence = self._sigmoid(raw_score)
         report.passed = report.confidence >= self.config.confidence_threshold
@@ -595,7 +615,7 @@ class VerifierStack:
         error = target - report.confidence
         learning_rate = 0.1
 
-        # Gradient update for all 6 layers
+        # Gradient update for all 7 layers
         for key, v_score in [
             ("static", report.v_static),
             ("property", report.v_property),
@@ -603,6 +623,7 @@ class VerifierStack:
             ("critic", report.v_critic),
             ("code", report.v_code),
             ("security", report.v_security),
+            ("symbolic", report.v_symbolic),
         ]:
             gradient = error * v_score * report.confidence * (1 - report.confidence)
             self.alpha[key] += learning_rate * gradient

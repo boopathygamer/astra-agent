@@ -103,6 +103,12 @@ DOMAIN_KEYWORDS: Dict[str, List[Tuple[str, float]]] = {
         ("scholarship", 1.0), ("gpa", 1.0), ("university", 0.8), ("school", 0.6),
         ("textbook", 0.9), ("syllabus", 1.0), ("understand", 0.3),
     ],
+    "sgi_ceo": [
+        ("build an entire", 1.0), ("planetary", 1.0), ("massive", 0.8),
+        ("full stack app", 1.0), ("complex system", 0.9), ("complete project", 0.9),
+        ("super general intelligence", 1.0), ("framework", 0.7), ("architecture", 0.8),
+        ("deploy an entire", 0.9), ("massive scale", 0.9)
+    ],
     "health": [
         ("health", 0.9), ("nutrition", 1.0), ("exercise", 0.9), ("fitness", 1.0),
         ("diet", 0.9), ("calories", 1.0), ("protein", 0.9), ("vitamin", 1.0),
