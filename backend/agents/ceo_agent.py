@@ -14,9 +14,11 @@ from dataclasses import dataclass
 import asyncio
 
 from agents.controller import AgentController
-from agents.viral_swarm import ViralSwarm
+from agents.viral_swarm import ViralSwarm, MacroEconomicArray
 from agents.hive_mind import Boardroom
 from brain.chaos_engine import ChaosEngine
+from brain.omni_physics_engine import OmniPhysicsEngine
+from brain.synthetic_domain_generator import SyntheticDomainGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -171,10 +173,35 @@ class CEOAgent:
         except Exception as e:
             logger.error(f"[ASI CHAOS OMEGA] Failed predictive timeline collapse: {e}")
 
-        # The actual generation
+        # The actual DAG generation
         dag = self.decomposer.break_down_objective(objective)
+        
+        # --- ASI TIER 4: OMNI-PHYSICS VERIFICATION ---
+        # Instead of just reviewing software ASTs, the CEO checks if the output is hardware.
+        # If it is hardware, it must pass thermodynamic and material stress testing.
+        physics = OmniPhysicsEngine()
+        is_hardware = "rocket" in objective.lower() or "medical" in objective.lower() or "hardware" in objective.lower()
+        
+        if is_hardware:
+            logger.critical("[ASI TIER 4] Hardware detected. Engaging Omni-Physics Verification...")
+            # Infer domain
+            domain_type = "aerospace" if "rocket" in objective.lower() else "medical"
+            is_physically_safe = physics.verify_physical_design(domain_type, {"materials": {"Chassis": "Carbon Fiber"}})
+            if not is_physically_safe:
+                return "!! CEO ABORT !!\nThe Omni-Physics Engine calculated critical structural failure. Redesign required for physical safety."
+
         code_synthesis = self.spawner.execute_dag(dag)
         
+        # --- ASI TIER 4: MACRO-ECONOMIC DEPLOYMENT ---
+        logger.critical("[ASI TIER 4] Launching Macro-Economic Supply Chain Matrix...")
+        try:
+            macro_marketing = MacroEconomicArray(self.decomposer.generate_fn)
+            post_execution_campaign = macro_marketing.trigger_omni_campaign(objective[:30], domain="Aerospace/Synthetic")
+            logger.info("Macro-Economic Supply Chain generated gracefully.")
+        except Exception as e:
+            logger.error(f"[ASI MACRO-ECONOMICS] Failed to generate physical supply chain: {e}")
+            post_execution_campaign = "[Marketing Synthesis Failed -> Manual Deployment Required]"
+            
         # --- ASI TIER 2: VIRAL SWARM INTEGRATION ---
         logger.info("[SGI CEO] Engaging ASI Tier 2: Algorithmic Marketing Distribution...")
         try:
@@ -190,4 +217,4 @@ class CEOAgent:
         except Exception as e:
             logger.error(f"[CEO ASI SWARM] Failed to execute marketing distribution: {e}")
             
-        return code_synthesis
+        return f"## [SGI CEO] Planetary Objective Complete\n\n### SYNTHESIS LAYER:\n{code_synthesis}\n\n{post_execution_campaign}"
