@@ -11,9 +11,12 @@ import logging
 import time
 from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass
+import asyncio
 
 from agents.controller import AgentController
 from agents.viral_swarm import ViralSwarm
+from agents.hive_mind import Boardroom
+from brain.chaos_engine import ChaosEngine
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +148,30 @@ class CEOAgent:
         self.spawner = SubAgentSpawner(generate_fn, tools, event_callback)
         
     def execute_planetary_task(self, objective: str) -> str:
+        # --- ASI TIER 3: BOARDROOM CONVENING ---
+        try:
+            board = Boardroom(self.decomposer.generate_fn)
+            logger.critical("[ASI TIER 3] CEO Consulting Digital Human Clones...")
+            board_notes = board.hold_meeting(objective)
+            logger.info("Boardroom consensus reached. Transmitting to DAG generator.")
+            objective = f"HUMAN CLONE DIRECTIVES:\n{board_notes}\n\nFINAL OBJECTIVE:\n{objective}"
+        except Exception as e:
+            logger.error(f"[ASI HIVE-MIND] Failed to summon clones: {e}")
+            
+        # --- ASI TIER 3: SYNTHETIC CHAOS PREDICTION ---
+        try:
+            chaos = ChaosEngine(self.decomposer.generate_fn)
+            logger.critical("[ASI TIER 3] Engaging Predictive Monte Carlo Simulation...")
+            loop = asyncio.new_event_loop()
+            will_succeed = loop.run_until_complete(chaos.predict_future_outcome(objective))
+            loop.close()
+            
+            if not will_succeed:
+                return "!! CEO ABORT !!\nThe Synthetic Chaos Matrix mathematically predicts this project will collapse upon human deployment. Execution Sequence Terminated to prevent capital loss."
+        except Exception as e:
+            logger.error(f"[ASI CHAOS OMEGA] Failed predictive timeline collapse: {e}")
+
+        # The actual generation
         dag = self.decomposer.break_down_objective(objective)
         code_synthesis = self.spawner.execute_dag(dag)
         
