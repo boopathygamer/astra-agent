@@ -28,7 +28,11 @@ class CrossDisciplinaryCollider:
             "Aerospace Fluid Dynamics",
             "Non-Euclidean Topology",
             "CRISPR Genetic Editing",
-            "High-Frequency Algorithmic Economics"
+            "High-Frequency Algorithmic Economics",
+            "Orbital Astrometry",
+            "Radiative Thermodynamics in Space",
+            "Deep Space Infrastructure",
+            "Non-Terrestrial Life Support Systems"
         ]
         
     def generate_collision(self) -> tuple:

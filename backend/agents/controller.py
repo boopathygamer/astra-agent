@@ -345,6 +345,37 @@ class AgentController:
                 metadata={"mode": "sgi_ceo", "confidence": 1.0},
             )
             return response
+
+        # ── TIER 6 OMNI SOLVER INTERCEPTION ──
+        # Triggers if the user wants complex, multi-dimensional, universal problem solving
+        if "solve" in user_input.lower() and ("everything" in user_input.lower() or "complex" in user_input.lower() or "omni" in user_input.lower() or "universal" in user_input.lower() or "no matter how" in user_input.lower()):
+            from brain.universal_omni_solver import UniversalOmniSolver
+            logger.critical("Universal Router: Tier 6 Universal Omni-Solver Request Detected. Escalating.")
+            
+            if event_callback:
+                event_callback({
+                    "type": "execution_step",
+                    "step": 1,
+                    "phase": "routing",
+                    "agent": self.agent_id,
+                    "action": "Escalating to Tier 6 Universal Omni-Solver...",
+                    "duration": 0,
+                    "status": "running"
+                })
+                
+            solver = UniversalOmniSolver(self.generate_fn)
+            omni_result = solver.execute_omni_solution(user_input)
+            
+            response.answer = omni_result
+            response.confidence = 1.0
+            response.mode = "omni_solver_executed"
+            response.duration_ms = (time.time() - start_time) * 1000
+            
+            self.session_manager.add_message(
+                active_session, "assistant", response.answer,
+                metadata={"mode": "omni_solver", "confidence": 1.0},
+            )
+            return response
         
         # FEATURE 1: Dynamic Domain Generation
         # If confidence is 0.0 (no match), generate a dynamic expert context on the fly

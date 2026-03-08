@@ -13,6 +13,11 @@ import math
 import logging
 from typing import Dict, Any
 
+try:
+    from brain.space_engineering_engine import AdvancedSpaceEngineeringEngine
+except ImportError:
+    from space_engineering_engine import AdvancedSpaceEngineeringEngine
+
 logger = logging.getLogger(__name__)
 
 class MaterialConstraintSolver:
@@ -88,6 +93,7 @@ class OmniPhysicsEngine:
         self.mechanics = MaterialConstraintSolver()
         self.thermals = ThermalDynamicsModule()
         self.biology = BioChemicalSimulator()
+        self.space_systems = AdvancedSpaceEngineeringEngine()
         
     def verify_physical_design(self, domain_type: str, specs: dict) -> bool:
         """
@@ -117,6 +123,11 @@ class OmniPhysicsEngine:
             ph = specs.get("ph_level", 7.4)
             half_life = specs.get("half_life_hours", 12.0)
             is_safe = is_safe and self.biology.verify_compound_stability(ph, half_life)
+            
+        elif domain_type == "space_infrastructure" or domain_type == "astrodynamics":
+            results = self.space_systems.execute_planetary_mission_design(specs)
+            if results.get("thermal_survival") is False or results.get("delta_v", 1) < 0:
+                is_safe = False
             
         if is_safe:
             logger.warning(f"[ASI TIER 4] Omni-Physics Verification PASSED. {domain_type.upper()} hardware is safe to manufacture.")
