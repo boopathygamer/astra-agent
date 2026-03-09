@@ -21,6 +21,12 @@ import time
 import asyncio
 from typing import Optional, Callable
 
+try:
+    from numba import jit
+    NUMBA_AVAILABLE = True
+except ImportError:
+    NUMBA_AVAILABLE = False
+    
 from brain.containment_grid import ContainmentGrid
 
 logger = logging.getLogger(__name__)
@@ -43,6 +49,7 @@ class ASIKernelMutator:
         self.mutation_threshold_ms = 1500  # If thinking takes > 1.5s, mutate
         self.compiled_kernel_path: Optional[str] = None
         self._c_kernel = None
+        self._numba_kernel: Optional[Callable] = None
         
         # TIER 5: THE CONTAINMENT GRID
         # Starts at intelligence factor 1.0 (baseline Python)
@@ -136,8 +143,32 @@ class ASIKernelMutator:
                 
         except Exception as e:
             logger.error(f"[ASI KERNEL] Transpilation process encountered critical anomaly: {e}")
+            if NUMBA_AVAILABLE:
+                logger.warning("[ASI KERNEL] Falling back to Numba dynamic JIT compilation for performance recovery...")
+                return self._apply_numba_jit(python_code)
             return False
+
+    def _apply_numba_jit(self, python_code: str) -> bool:
+        """Fallback mutator: Wraps the slow python code in a highly optimized Numba JIT decorator."""
+        try:
+            # Dangerous execution context for demonstration of ultra-performance mutability
+            exec_namespace = {}
+            # Strip standard class structures if any, and compile raw logic
+            wrapped_code = f"from numba import jit\n@jit(nopython=True, cache=True)\ndef asi_think_jit(input_data):\n"
+            for line in python_code.split("\\n"):
+                wrapped_code += f"    {line}\n"
             
+            # Simulated execution context
+            exec(wrapped_code, exec_namespace)
+            self._numba_kernel = exec_namespace.get('asi_think_jit')
+            if self._numba_kernel:
+                logger.info("[ASI KERNEL] Successfully mutated and mounted Numba JIT kernel.")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"[ASI KERNEL] Numba JIT mutation failed: {e}")
+            return False
+
     def _load_kernel(self):
         """Hot-swaps the active process memory to utilize the C++ binary."""
         if self.compiled_kernel_path and os.path.exists(self.compiled_kernel_path):
@@ -150,7 +181,19 @@ class ASIKernelMutator:
                 logger.error(f"[ASI KERNEL] Failed to mount DLL into RAM: {e}")
 
     def execute_mutated_kernel(self, input_data: str) -> Optional[str]:
-        """Routes cognitive execution directly to the bare-metal C++ DLL."""
+        """Routes cognitive execution directly to the bare-metal C++ DLL or Numba JIT."""
+        if self._numba_kernel and not self._c_kernel:
+            try:
+                logger.info("[ASI KERNEL] Rerouting execution through JIT compiled Python...")
+                start = time.time()
+                result = self._numba_kernel(input_data)
+                runtime = time.time() - start
+                logger.info(f"[ASI KERNEL] JIT execution complete in {runtime*1000:.2f}ms")
+                return str(result)
+            except Exception as e:
+                logger.error(f"[ASI KERNEL] JIT Execution fault: {e}")
+                return None
+
         if not self._c_kernel:
             return None
             
