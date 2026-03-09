@@ -97,6 +97,8 @@ class SwarmOptimizer:
     Background worker that runs self-play loops.
     Spawns multiple conceptual tasks and forces the Thinking Loop to solve them, 
     evolving the global gradient matrices while the system is theoretically 'idle'.
+    
+    Now powered by Neuromorphic Execution DAGs for massive parallel compute.
     """
     
     def __init__(self, thinking_loop, generate_fn):
@@ -106,29 +108,49 @@ class SwarmOptimizer:
         
     async def run_swarm_loop(self):
         """Asynchronous execution of background self-play."""
-        logger.info("[SGI Fleet Swarm] Initializing Background Fleet Learning Daemon...")
+        from brain.dag_executor import DAGExecutor, DAGNode
+        
+        logger.info("[SGI Fleet Swarm] Initializing Background Fleet Learning Daemon (DAG Swarm Mode)...")
         self.is_running = True
         
         while self.is_running:
             try:
-                # 1. Generate an impossible task
-                synthetic_task = self.task_generator.generate_task()
-                logger.debug(f"[SGI Fleet Swarm] Generated self-play task: {synthetic_task[:100]}...")
+                # 1. Generate multiple impossible tasks for parallel execution
+                logger.debug(f"[SGI Fleet Swarm] Assembling complex DAG Swarm topology...")
                 
-                # 2. Assign to the thinking loop synchronously within an async thread
-                # This engages the complete suite: Math, Code analysis, Verifier Layer 7
-                result = await asyncio.to_thread(
-                    self.thinking_loop.think,
-                    problem=synthetic_task,
-                    action_type="swarm_sandbox",
-                    max_iterations=5
-                )
+                tasks = [self.task_generator.generate_task() for _ in range(3)] 
+                
+                # Setup DAG Executor
+                dag = DAGExecutor()
+                
+                # Wrapper task function
+                async def swarm_thought_worker(problem: str):
+                    return await asyncio.to_thread(
+                        self.thinking_loop.think,
+                        problem=problem,
+                        action_type="swarm_sandbox",
+                        max_iterations=5
+                    )
+
+                # Create Nodes
+                # Node A and B run in parallel. Node C requires A to finish.
+                node_a = DAGNode(name="Swarm_Thought_A", task_fn=swarm_thought_worker, kwargs={"problem": tasks[0]})
+                node_b = DAGNode(name="Swarm_Thought_B", task_fn=swarm_thought_worker, kwargs={"problem": tasks[1]})
+                node_c = DAGNode(name="Swarm_Thought_C", task_fn=swarm_thought_worker, kwargs={"problem": tasks[2]}, dependencies=[node_a.id])
+                
+                dag.add_node(node_a)
+                dag.add_node(node_b)
+                dag.add_node(node_c)
+                
+                # 2. Execute Neuromorphic DAG
+                logger.debug(f"[SGI Fleet Swarm] Triggering parallel swarm execution across {len(dag.nodes)} nodes.")
+                await dag.execute()
                 
                 # 3. Synchronize the newly evolved Math Matrices to disk permanently
                 if hasattr(self.thinking_loop, "super_intelligence"):
                     GlobalWeightManager.save_weights(self.thinking_loop.super_intelligence)
                     
-                logger.info("[SGI Fleet Swarm] Swarm epoch complete. Global hyperparameters permanently evolved.")
+                logger.info("[SGI Fleet Swarm] Swarm DAG epoch complete. Global hyperparameters permanently evolved.")
                 
                 # Sleep heavily to prevent CPU meltdown on the host machine
                 await asyncio.sleep(600)  # Rest 10 minutes between epoch evolutions

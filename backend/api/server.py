@@ -151,10 +151,10 @@ class AppState:
     engine = None
     vision_pipeline = None
     agent_controller = None
+    predictive_cache = None
     is_ready = False
 
 state = AppState()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -184,6 +184,13 @@ async def lifespan(app: FastAPI):
                 generate_fn = registry.generate_fn()
                 state.agent_controller = AgentController(generate_fn=generate_fn)
                 logger.info("✅ Agent controller ready (Active Provider)")
+                
+                # ── Init PreCognitive Cache ──
+                from brain.predictive_cache import PreCognitiveCache
+                state.predictive_cache = PreCognitiveCache(generate_fn=generate_fn)
+                state.predictive_cache.start()
+                logger.info("⚡ PreCognitive Shadow Execution Engine activated.")
+                
             except Exception as e:
                 logger.error(f"⚠️ Failed to create AgentController with registry: {e}")
         else:
@@ -218,6 +225,9 @@ async def lifespan(app: FastAPI):
     
     # ── Graceful Shutdown ──
     logger.info("⏳ Graceful shutdown — draining in-flight tasks...")
+    
+    if state.predictive_cache:
+        state.predictive_cache.stop()
     
     # 1. Stop log exporter
     try:
@@ -283,6 +293,12 @@ try:
     app.include_router(ws_router)
 except ImportError:
     pass
+
+try:
+    from api.routes.neural_uplink import router as neural_router
+    app.include_router(neural_router)
+except ImportError as e:
+    logger.error(f"Failed to mount Neural Uplink router: {e}")
 
 # ──────────────────────────────────────────────
 # Provider Configuration Endpoints
