@@ -187,37 +187,49 @@ class UniversalProvider(ModelProvider):
         if not self._client:
             return GenerationResult(error="Universal client not initialized")
 
-        start = time.time()
-        try:
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
+        _MAX_RETRIES = 3
+        _BACKOFF_BASE = 1.5  # seconds
 
-            response = self._client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
-            latency = (time.time() - start) * 1000
-            text = response.choices[0].message.content or ""
-            token_count = response.usage.total_tokens if response.usage else 0
+        last_error = ""
+        for attempt in range(_MAX_RETRIES):
+            start = time.time()
+            try:
+                response = self._client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
 
-            self._track(latency)
-            return GenerationResult(
-                text=text,
-                provider="universal",
-                model=self.model,
-                tokens_used=token_count,
-                latency_ms=latency,
-            )
-        except Exception as e:
-            latency = (time.time() - start) * 1000
-            self._track(latency, error=True)
-            logger.error(f"Universal generate error: {e}")
-            return GenerationResult(error=str(e), provider="universal")
+                latency = (time.time() - start) * 1000
+                text = response.choices[0].message.content or ""
+                token_count = response.usage.total_tokens if response.usage else 0
+
+                self._track(latency)
+                return GenerationResult(
+                    text=text,
+                    provider="universal",
+                    model=self.model,
+                    tokens_used=token_count,
+                    latency_ms=latency,
+                )
+            except Exception as e:
+                latency = (time.time() - start) * 1000
+                self._track(latency, error=True)
+                last_error = str(e)
+                if attempt < _MAX_RETRIES - 1:
+                    backoff = _BACKOFF_BASE * (2 ** attempt)
+                    logger.warning(f"Universal generate attempt {attempt+1} failed: {e}. Retrying in {backoff:.1f}s...")
+                    time.sleep(backoff)
+                else:
+                    logger.error(f"Universal generate exhausted {_MAX_RETRIES} retries: {e}")
+
+        return GenerationResult(error=last_error, provider="universal")
 
     def stream(
         self,

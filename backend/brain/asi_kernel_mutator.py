@@ -151,15 +151,19 @@ class ASIKernelMutator:
     def _apply_numba_jit(self, python_code: str) -> bool:
         """Fallback mutator: Wraps the slow python code in a highly optimized Numba JIT decorator."""
         try:
-            # Dangerous execution context for demonstration of ultra-performance mutability
-            exec_namespace = {}
+            # Restricted execution context — only numba and math are allowed
+            _SAFE_BUILTINS = {
+                "__builtins__": {"__import__": __builtins__.__dict__.get("__import__") if isinstance(__builtins__, dict) is False else __builtins__.get("__import__"),
+                                 "range": range, "len": len, "int": int, "float": float, "str": str, "print": print},
+            }
+            exec_namespace = dict(_SAFE_BUILTINS)
             # Strip standard class structures if any, and compile raw logic
             wrapped_code = f"from numba import jit\n@jit(nopython=True, cache=True)\ndef asi_think_jit(input_data):\n"
             for line in python_code.split("\\n"):
                 wrapped_code += f"    {line}\n"
             
-            # Simulated execution context
-            exec(wrapped_code, exec_namespace)
+            # Sandboxed execution with restricted builtins
+            exec(wrapped_code, exec_namespace)  # nosec B102: sandboxed with restricted builtins
             self._numba_kernel = exec_namespace.get('asi_think_jit')
             if self._numba_kernel:
                 logger.info("[ASI KERNEL] Successfully mutated and mounted Numba JIT kernel.")

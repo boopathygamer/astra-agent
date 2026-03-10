@@ -87,6 +87,14 @@ class SyntheticTaskGenerator:
             "Do NOT output the solution. Do NOT use markdown. Output ONLY the complex task description natively."
         )
         try:
+            # ── Check for AirLLM Deep Thought Routing ──
+            try:
+                from brain.airllm_engine import deep_thought_engine
+                if deep_thought_engine.is_loaded:
+                    return deep_thought_engine.generate(prompt, max_new_tokens=512)
+            except ImportError:
+                pass
+                
             return self.generate_fn(prompt)
         except Exception as e:
             logger.error(f"Task generation failed: {e}")

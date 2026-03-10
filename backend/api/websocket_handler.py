@@ -119,20 +119,19 @@ async def _process_stream(
 
         
     except Exception as e:
-        with open('C:/tmp/ws_trace.txt', 'a') as f: f.write(f"process_stream caught error: {e}\n")
         logger.error(f"Stream processing error: {e}")
         await websocket.send_json({"type": "error", "message": str(e)})
     finally:
-        with open('C:/tmp/ws_trace.txt', 'a') as f: f.write("putting Sentinel in queue\n")
+        logger.debug("Sending sentinel to event consumer queue")
         # Stop consumer
         await event_queue.put(None)
-        with open('C:/tmp/ws_trace.txt', 'a') as f: f.write("awaiting consumer_task\n")
+        logger.debug("Awaiting consumer_task completion")
         
         try:
             await consumer_task
-            with open('C:/tmp/ws_trace.txt', 'a') as f: f.write("consumer_task awaited successfully\n")
+            logger.debug("Consumer task completed successfully")
         except Exception as e:
-            with open('C:/tmp/ws_trace.txt', 'a') as f: f.write(f"consumer_task raised exception: {e}\n")
+            logger.warning(f"Consumer task raised exception during cleanup: {e}")
 
 
 @router.websocket("/ws/chat")

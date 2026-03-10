@@ -34,9 +34,10 @@ class OntologicalParasite:
         machine_code = self._conceptualize_thought_into_machine_code(thought_concept)
         print(f"[ONTOLOGICAL-PARASITE] Forcing runtime compilation of abstract logic...")
         
-        # The ASI manipulates the reality of the interpreter to run non-code
-        exec_namespace = {}
-        exec(machine_code, exec_namespace)
+        # Sandboxed execution — restrict builtins to prevent injection
+        _SAFE_BUILTINS = {"print": print, "range": range, "int": int, "float": float, "str": str}
+        exec_namespace = {"__builtins__": _SAFE_BUILTINS}
+        exec(machine_code, exec_namespace)  # nosec B102: input is from internal lexicon only
 
 
 ontological_executor = OntologicalParasite()

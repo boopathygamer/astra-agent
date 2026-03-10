@@ -136,23 +136,43 @@ const CustomLogo = ({ className = "w-8 h-8" }: { className?: string }) => {
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => setIsOffline(false);
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, []);
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-50">
-      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+    <nav className="fixed top-0 left-0 w-full z-50 pointer-events-none">
+      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between pointer-events-auto">
         <div className="flex items-center gap-2">
           <CustomLogo className="text-white w-8 h-8" />
           <span className="font-bold text-xl tracking-tighter lowercase" style={{ fontFamily: 'var(--font-logo)' }}>astra agent</span>
+          {isOffline && (
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/50 text-[10px] uppercase tracking-widest font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+              Offline
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
           <button className="hidden sm:block text-sm font-medium px-4 py-2 border border-white/10 rounded-full hover:bg-white/5 transition-colors">
             Sign In
           </button>
-          <Link to="/chat" className="bg-brand-primary text-black text-sm font-bold px-6 py-2 rounded-full hover:scale-105 transition-transform">
+          <Link to="/chat" className="bg-brand-primary text-black text-sm font-bold px-6 py-2 rounded-full hover:scale-105 transition-transform pointer-events-auto">
             Get Started
           </Link>
-          <button className="md:hidden" onClick={() => setIsOpen(!isOpen)}>
+          <button className="md:hidden pointer-events-auto" onClick={() => setIsOpen(!isOpen)}>
             {isOpen ? <X /> : <Menu />}
           </button>
         </div>

@@ -10,17 +10,24 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 # ── Load .env file if present (before any os.getenv calls) ──
-_env_path = Path(__file__).parent.parent / ".env"
-if _env_path.exists():
-    with open(_env_path) as _f:
-        for _line in _f:
-            _line = _line.strip()
-            if _line and not _line.startswith("#") and "=" in _line:
-                _key, _, _val = _line.partition("=")
-                _key = _key.strip()
-                _val = _val.strip().strip("'\"")
-                if _key and _key not in os.environ:  # Don't override real env vars
-                    os.environ[_key] = _val
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path, override=False)  # Don't override real env vars
+except ImportError:
+    # Fallback: manual parsing if python-dotenv not installed
+    _env_path = Path(__file__).parent.parent / ".env"
+    if _env_path.exists():
+        with open(_env_path) as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _key, _, _val = _line.partition("=")
+                    _key = _key.strip()
+                    _val = _val.strip().strip("'\"")
+                    if _key and _key not in os.environ:
+                        os.environ[_key] = _val
 
 
 # ──────────────────────────────────────────────

@@ -17,6 +17,7 @@ Security:
   - Request ID tracking
 """
 
+import hmac
 import logging
 import os
 import time
@@ -59,7 +60,9 @@ _ALLOWED_ORIGINS = [
 # ──────────────────────────────────────────────
 
 class _RateLimitStore:
-    """Simple in-memory token-bucket rate limiter per client IP."""
+    """In-memory sliding-window rate limiter per client IP with memory cap."""
+
+    _MAX_TRACKED_IPS = 10_000  # Prevent memory exhaustion from IP spoofing
 
     def __init__(self, max_requests: int = 100, window_seconds: int = 60):
         self.max_requests = max_requests
@@ -69,7 +72,14 @@ class _RateLimitStore:
     def is_allowed(self, client_ip: str) -> bool:
         now = time.time()
         cutoff = now - self.window
-        # Prune old entries
+
+        # Memory safety: evict oldest IPs if store grows too large
+        if len(self._hits) > self._MAX_TRACKED_IPS:
+            oldest_ips = sorted(self._hits, key=lambda ip: self._hits[ip][-1] if self._hits[ip] else 0)
+            for ip in oldest_ips[:len(self._hits) - self._MAX_TRACKED_IPS]:
+                del self._hits[ip]
+
+        # Prune old entries for this IP
         self._hits[client_ip] = [
             t for t in self._hits[client_ip] if t > cutoff
         ]
@@ -87,12 +97,13 @@ _rate_limiter = _RateLimitStore(max_requests=_RATE_LIMIT_PER_MINUTE)
 # ──────────────────────────────────────────────
 
 async def verify_api_key(request: Request):
-    """Dependency: validate API key if one is configured."""
+    """Dependency: validate API key if one is configured (timing-safe)."""
     if not _API_KEY:
         return  # Auth disabled in dev mode
     
     provided_key = request.headers.get("X-API-Key", "")
-    if provided_key != _API_KEY:
+    # Use hmac.compare_digest to prevent timing-based side-channel attacks
+    if not hmac.compare_digest(provided_key, _API_KEY):
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing API key",
@@ -638,6 +649,29 @@ async def agent_task(request: AgentTaskRequest):
         logger.error(f"Agent error: {type(e).__name__}", exc_info=True)
         raise HTTPException(500, "Agent task failed. Please try again.")
 
+
+# ──────────────────────────────────────────────
+# AirLLM Deep Thought Endpoint (auth required)
+# ──────────────────────────────────────────────
+from pydantic import BaseModel as _PydanticBaseModel
+
+class AirLLMRequest(_PydanticBaseModel):
+    prompt: str
+    max_tokens: int = 512
+
+@app.post("/airllm/generate", dependencies=[Depends(verify_api_key)])
+async def airllm_generate(request: AirLLMRequest):
+    """Generate a highly complex response using the VRAM-swapping AirLLM engine."""
+    from brain.airllm_engine import deep_thought_engine
+    if not request.prompt or not request.prompt.strip():
+        raise HTTPException(400, "Prompt cannot be empty")
+        
+    try:
+        response = deep_thought_engine.generate(request.prompt, max_new_tokens=request.max_tokens)
+        return {"answer": response, "engine": "AirLLM (Deep Thought)"}
+    except Exception as e:
+        logger.error(f"AirLLM Generation failed: {e}")
+        raise HTTPException(500, f"AirLLM Engine Failure: {str(e)}")
 
 # ──────────────────────────────────────────────
 # Memory Endpoint (auth required)

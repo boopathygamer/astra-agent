@@ -16,25 +16,63 @@ interface FetchOptions {
 async function apiFetch<T = any>(path: string, opts: FetchOptions = {}): Promise<T> {
     const { method = 'GET', body, headers = {} } = opts;
 
-    const res = await fetch(`${API_BASE}${path}`, {
-        method,
-        headers: {
-            'Content-Type': 'application/json',
-            ...headers,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-    });
+    const _MAX_RETRIES = 3;
+    const _TIMEOUT_MS = 30_000; // 30-second request timeout
+    const _BACKOFF_BASE = 1000; // 1 second
 
-    if (!res.ok) {
-        let detail = `Request failed (${res.status})`;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < _MAX_RETRIES; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), _TIMEOUT_MS);
+
         try {
-            const err = await res.json();
-            detail = err.detail || err.error || detail;
-        } catch { /* ignore parse errors */ }
-        throw new Error(detail);
+            const res = await fetch(`${API_BASE}${path}`, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...headers,
+                },
+                body: body ? JSON.stringify(body) : undefined,
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+                let detail = `Request failed (${res.status})`;
+                try {
+                    const err = await res.json();
+                    detail = err.detail || err.error || detail;
+                } catch { /* ignore parse errors */ }
+
+                // Don't retry client errors (4xx), only server errors (5xx)
+                if (res.status >= 400 && res.status < 500) {
+                    throw new Error(detail);
+                }
+                throw new Error(detail);
+            }
+
+            return res.json();
+        } catch (err: any) {
+            clearTimeout(timeoutId);
+            lastError = err;
+
+            // Don't retry AbortErrors from user cancellation (only timeout)
+            const isTimeout = err.name === 'AbortError';
+            const isNetworkError = err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError');
+
+            if ((isTimeout || isNetworkError) && attempt < _MAX_RETRIES - 1) {
+                const backoff = _BACKOFF_BASE * (2 ** attempt);
+                await new Promise(resolve => setTimeout(resolve, backoff));
+                continue;
+            }
+
+            throw err;
+        }
     }
 
-    return res.json();
+    throw lastError || new Error('Request failed after retries');
 }
 
 // ── Health ───────────────────────────────────────

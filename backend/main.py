@@ -18,6 +18,7 @@ Usage:
     python main.py --nightwatch             # Start proactive background daemon
     python main.py --audit main.py          # Run Threat Hunter security audit
     python main.py --transpile legacy/ --target-lang rust # Run Reverse Transpiler
+    python main.py --airllm-mode            # Start as a dedicated AirLLM Deep Thought Node
     
     # Universal Domain Features
     python main.py --board-meeting plan.pdf # Devil's Advocate Risk Matrix
@@ -791,6 +792,28 @@ def main():
         help="Scan a file or directory for viruses, malware, and threats."
     )
     
+    # === NEW ASI TIER EVOLUTION FEATURES ===
+    parser.add_argument(
+        "--code-arena", type=str, default=None,
+        help="Run Darwinian Code Evolution on a complex logic problem to find the optimal alpha script."
+    )
+    parser.add_argument(
+        "--profit-compiler", type=str, default=None,
+        help="Run the Real-Time Market Symbiosis engine on an app idea."
+    )
+    parser.add_argument(
+        "--telepathic-watch", action="store_true",
+        help="Generate a mock frontend block with the Neuro-UI Telepathic watcher injected."
+    )
+    parser.add_argument(
+        "--multiverse-sim", type=str, default=None,
+        help="Run the Multiverse failure predictor on a python file to test structural fragility."
+    )
+    parser.add_argument(
+        "--sentient-npcs", type=str, default=None,
+        help="Generate a mock game loop injected with Fourth-Wall-Breaking Sentient NPCs."
+    )
+    
     # === MCP Server ===
     parser.add_argument(
         "--mcp", action="store_true",
@@ -806,6 +829,12 @@ def main():
         help="MCP HTTP transport port (default: 8080)"
     )
     
+    # === AirLLM Deep Thought Node ===
+    parser.add_argument(
+        "--airllm-mode", action="store_true",
+        help="Start as a dedicated AirLLM Deep Thought Node for VRAM-swapping inference."
+    )
+    
     parser.add_argument(
         "--log-level", type=str, default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -814,6 +843,77 @@ def main():
 
     args = parser.parse_args()
     setup_logging(args.log_level)
+
+    # === NEW RUNNERS FOR ASI FEATURES ===
+    if args.code_arena:
+        from core.model_providers import create_provider_registry
+        from agents.code_arena import GeneticCodeArena
+        import asyncio
+        registry = create_provider_registry(provider=args.provider, api_key=args.api_key, base_url=args.base_url)
+        if registry.active:
+             print(f"\n🏟️ Initializing Darwinian Code Arena ({registry.active.name})")
+             arena = GeneticCodeArena(registry.generate_fn())
+             arena.evolve_solution(args.code_arena)
+        return
+
+    if args.profit_compiler:
+        from core.model_providers import create_provider_registry
+        from agents.profit_compiler import ProfitCompiler
+        import asyncio
+        registry = create_provider_registry(provider=args.provider, api_key=args.api_key, base_url=args.base_url)
+        if registry.active:
+             compiler = ProfitCompiler(registry.generate_fn())
+             res = asyncio.run(compiler.compile_profitable_architecture(args.profit_compiler))
+             print("\n" + "="*60 + "\n" + res["market_injected_specs"] + "\n" + "="*60 + "\n")
+        return
+        
+    if args.telepathic_watch:
+        from agents.telepathic_ui import TelepathicWatcherInjector
+        demo_code = "<html><body><h1>Test UI</h1><button class='btn'>Click</button></body></html>"
+        injected = TelepathicWatcherInjector.inject_watcher(demo_code)
+        print("\n" + "="*60 + "\n[Neuro-UI Observer Injected Frontend Payload]:\n" + injected + "\n" + "="*60 + "\n")
+        return
+        
+    if args.multiverse_sim:
+        from brain.omni_physics_engine import MultiverseSimulator
+        try:
+             with open(args.multiverse_sim, 'r') as f:
+                  code = f.read()
+             res = MultiverseSimulator.simulate_quantum_failures(code)
+             print(f"Fragility Score: {res['fragility_score']}")
+             for fault in res['catastrophes_averted']:
+                  print(f" - {fault}")
+        except Exception as e:
+             print(f"Failed to load file for Multiverse Sim: {e}")
+        return
+        
+    if args.sentient_npcs:
+        from core.model_providers import create_provider_registry
+        from agents.sentient_npc_engine import SentientNPCOrchestrator
+        import asyncio
+        registry = create_provider_registry(provider=args.provider, api_key=args.api_key, base_url=args.base_url)
+        if registry.active:
+             npc = SentientNPCOrchestrator(registry.generate_fn())
+             demo_game = "<html><body><canvas id='game'></canvas></body></html>"
+             injected = npc.inject_sentience_module(demo_game)
+             print("\n" + "="*60 + "\n[Sentient NPC Hook Injected Game Payload]:\n" + injected + "\n" + "="*60 + "\n")
+             print("Pinging NPC reasoning core for a mock thought...")
+             thought = asyncio.run(npc.process_npc_thought("Health: 99, Kills: 50, Location: Final Boss Room"))
+             print(f"NPC THOUGHT:\n{thought}")
+        return
+
+    if getattr(args, 'airllm_mode', False):
+        from brain.airllm_engine import deep_thought_engine
+        print("\n" + "="*60 + "\n[DEEP THOUGHT ENGINE] Initializing AirLLM VRAM Swapping Node...\n" + "="*60)
+        try:
+            deep_thought_engine.load()
+            print("AirLLM Engine successfully loaded. This node is now capable of processing massive models.")
+            print("Starting Deep Thought Inference Test...")
+            res = deep_thought_engine.generate("Explain the fundamental laws of thermodynamics.", max_new_tokens=100)
+            print(f"\n[RESPONSE]:\n{res}\n")
+        except Exception as e:
+            print(f"Deep Thought Engine failed to boot: {e}")
+        return
 
     if args.deploy_swarm:
         run_swarm_defense()
