@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { sendChat, type ChatResponse } from './api';
 import ProjectUploader from './ProjectUploader';
+import DeployPanel, { ModelBadge, type DeployFile } from './DeployPanel';
 
 // ── Types ──
 interface Message { id: string; text: string; isUser: boolean; agent?: string; }
@@ -69,6 +70,7 @@ export default function WebDevPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [showUploader, setShowUploader] = useState(false);
+  const [showDeploy, setShowDeploy] = useState(false);
 
   const addLog = useCallback((msg: string) => {
     setAgentLogs(prev => [...prev, `[${new Date().toLocaleTimeString('en-US', { hour12: false })}] ${msg}`]);
@@ -285,13 +287,18 @@ export default function WebDevPage() {
             <MousePointer2 className="w-3.5 h-3.5" />
           </button>
           <div className="w-px h-5 bg-white/[0.06] mx-1" />
+          <ModelBadge onLog={addLog} />
+          <div className="w-px h-5 bg-white/[0.06] mx-1" />
           <button onClick={() => setShowUploader(true)} className="px-2.5 py-1 text-[11px] font-medium text-white/50 hover:text-white hover:bg-white/5 rounded-md transition-colors flex items-center gap-1.5">
             <Upload className="w-3 h-3" /> Import
           </button>
-          <button className="px-2.5 py-1 text-[11px] font-medium text-white/50 hover:text-white hover:bg-white/5 rounded-md transition-colors flex items-center gap-1.5">
+          <button onClick={() => { if (htmlContent) { const b = new Blob([htmlContent], { type: 'text/html' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'astra-web-app.html'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); addLog('📦 Exported HTML file'); } }}
+            disabled={!htmlContent}
+            className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 ${htmlContent ? 'text-white/50 hover:text-white hover:bg-white/5' : 'text-white/15 cursor-not-allowed'}`}>
             <Download className="w-3 h-3" /> Export
           </button>
-          <button className="px-2.5 py-1 text-[11px] font-bold bg-gradient-to-r from-violet-500 to-cyan-500 text-white rounded-md transition-all hover:shadow-[0_0_15px_rgba(139,92,246,0.3)] flex items-center gap-1.5">
+          <button onClick={() => setShowDeploy(true)} disabled={!htmlContent}
+            className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all flex items-center gap-1.5 ${htmlContent ? 'bg-gradient-to-r from-violet-500 to-cyan-500 text-white hover:shadow-[0_0_15px_rgba(139,92,246,0.3)]' : 'bg-white/[0.04] text-white/15 cursor-not-allowed'}`}>
             <Play className="w-3 h-3" /> Deploy
           </button>
         </div>
@@ -566,6 +573,17 @@ export default function WebDevPage() {
             }
           }
         }}
+      />
+
+      {/* Deploy Modal */}
+      <DeployPanel
+        isOpen={showDeploy}
+        onClose={() => setShowDeploy(false)}
+        mode="web"
+        files={generatedFiles.map(f => ({ name: f.name, content: f.content }))}
+        htmlContent={htmlContent}
+        appName="astra-web-app"
+        onLog={addLog}
       />
     </div>
   );

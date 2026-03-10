@@ -5,11 +5,12 @@ import {
     Maximize2, Shield, Loader2, CheckCircle2, XCircle, Cpu,
     ChevronRight, FileCode, FileText, FolderOpen, Bot, Zap, Lock,
     Smartphone, Tablet, AlertTriangle, Clock, Activity, Terminal,
-    Gamepad2, Upload
+    Gamepad2, Upload, Package
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { sendChat, type ChatResponse } from './api';
 import ProjectUploader from './ProjectUploader';
+import DeployPanel, { ModelBadge } from './DeployPanel';
 
 // ── Types ──
 interface Message { id: string; text: string; isUser: boolean; agent?: string; }
@@ -71,6 +72,7 @@ export default function GameDevPage() {
     const deviceRef = useRef<HTMLIFrameElement>(null);
     const logsEndRef = useRef<HTMLDivElement>(null);
     const [showUploader, setShowUploader] = useState(false);
+    const [showDeploy, setShowDeploy] = useState(false);
 
     const addLog = useCallback((msg: string) => {
         setAgentLogs(prev => [...prev, `[${new Date().toLocaleTimeString('en-US', { hour12: false })}] ${msg}`]);
@@ -248,14 +250,23 @@ export default function GameDevPage() {
                         {isLandscape ? 'Landscape' : 'Portrait'}
                     </button>
                     <div className="w-px h-5 bg-white/[0.06] mx-1" />
+                    <ModelBadge onLog={addLog} />
+                    <div className="w-px h-5 bg-white/[0.06] mx-1" />
                     <button onClick={() => setShowUploader(true)} className="px-2.5 py-1 text-[11px] font-medium text-white/50 hover:text-white hover:bg-white/5 rounded-md transition-colors flex items-center gap-1.5">
                         <Upload className="w-3 h-3" /> Import
                     </button>
-                    <button className="px-2.5 py-1 text-[11px] font-medium text-white/50 hover:text-white hover:bg-white/5 rounded-md transition-colors flex items-center gap-1.5">
+                    <button onClick={() => { if (htmlContent) { const b = new Blob([htmlContent], { type: 'text/html' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'astra-game.html'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); addLog('🎮 Exported game as HTML'); } }}
+                        disabled={!htmlContent}
+                        className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 ${htmlContent ? 'text-white/50 hover:text-white hover:bg-white/5' : 'text-white/15 cursor-not-allowed'}`}>
                         <Download className="w-3 h-3" /> Export
                     </button>
-                    <button className="px-2.5 py-1 text-[11px] font-bold bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-md transition-all hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] flex items-center gap-1.5">
-                        <Play className="w-3 h-3" /> Run Game
+                    <button onClick={() => setShowDeploy(true)} disabled={!htmlContent}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all flex items-center gap-1.5 ${htmlContent ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-[0_0_15px_rgba(249,115,22,0.3)]' : 'bg-white/[0.04] text-white/15 cursor-not-allowed'}`}>
+                        <Package className="w-3 h-3" /> Deploy
+                    </button>
+                    <button onClick={() => { if (input.trim()) handleBuild(input); }}
+                        className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all flex items-center gap-1.5 ${isBuilding ? 'bg-white/10 text-white/50' : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white hover:shadow-[0_0_15px_rgba(249,115,22,0.3)]'}`}>
+                        {isBuilding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} Run Game
                     </button>
                 </div>
             </header>
@@ -600,6 +611,17 @@ export default function GameDevPage() {
                     }
                     addConsole('info', `✅ Project loaded: ${analysis.fileCount} files ready for development`);
                 }}
+            />
+
+            {/* Deploy Modal */}
+            <DeployPanel
+                isOpen={showDeploy}
+                onClose={() => setShowDeploy(false)}
+                mode="game"
+                files={generatedFiles.map(f => ({ name: f.name, content: f.content }))}
+                htmlContent={htmlContent}
+                appName="ASTRA-Game"
+                onLog={addLog}
             />
         </div>
     );
