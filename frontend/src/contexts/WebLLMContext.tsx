@@ -4,6 +4,13 @@ import { CreateMLCEngine, InitProgressReport, MLCEngineInterface } from '@mlc-ai
 // Using a lightweight but capable coder model for fast browser interaction
 const SELECTED_MODEL = 'Llama-3-8B-Instruct-q4f32_1-MLC';
 
+// Expose globally for offline api.ts fallback
+declare global {
+    interface Window {
+        _webLlmEngine?: MLCEngineInterface | null;
+    }
+}
+
 interface WebLLMContextType {
     engine: MLCEngineInterface | null;
     isLoaded: boolean;
@@ -42,6 +49,7 @@ export const WebLLMProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             );
 
             setEngine(newEngine);
+            window._webLlmEngine = newEngine; // Expose globally
             setIsLoaded(true);
             setProgressText('Model Loaded and Ready.');
         } catch (error) {

@@ -109,10 +109,52 @@ export async function sendChat(
     message: string,
     useThinking: boolean = true,
 ): Promise<ChatResponse> {
-    return apiFetch<ChatResponse>('/chat', {
-        method: 'POST',
-        body: { message, use_thinking: useThinking },
-    });
+    const startTime = Date.now();
+    try {
+        return await apiFetch<ChatResponse>('/chat', {
+            method: 'POST',
+            body: { message, use_thinking: useThinking },
+        });
+    } catch (error: any) {
+        // ── OFFLINE FALLBACK ──
+        // If the backend fails (NetworkError, Server Down, No API keys) and the user has loaded WebLLM
+        if (typeof window !== 'undefined' && window._webLlmEngine) {
+            console.warn("Backend API failed. Routing request to local WebLLM Edge Agent.");
+            try {
+                const engine = window._webLlmEngine;
+                const reply = await engine.chat.completions.create({
+                    messages: [
+                        { role: "system", content: "You are the Astra Edge Agent. You run locally in the user's browser. You are an expert at coding, architecture, and generating full HTML/JS/CSS applications. Always output working code if requested." },
+                        { role: "user", content: message }
+                    ]
+                });
+
+                const offlineAnswer = reply.choices[0]?.message.content || "Offline inference failed.";
+
+                return {
+                    answer: offlineAnswer,
+                    confidence: 1.0,
+                    iterations: 1,
+                    mode: 'direct',
+                    thinking_steps: [
+                        `Backend unreachable: ${error.message || 'Network error'}`,
+                        "Intercepted failure natively in browser",
+                        "Routing to WebGPU / WebLLM Edge Core..."
+                    ],
+                    tools_used: ['webllm_edge_inference'],
+                    duration_ms: Date.now() - startTime,
+                    // These custom properties let the UI show an offline badge
+                    routed_to: 'WebLLM (Offline Edge Engine)',
+                    routing_emoji: '⚡'
+                };
+            } catch (fallbackError) {
+                console.error("Offline WebLLM fallback also failed:", fallbackError);
+            }
+        }
+
+        // If we reach here, either WebLLM isn't loaded or it failed too
+        throw error;
+    }
 }
 
 // ── Providers ───────────────────────────────────
