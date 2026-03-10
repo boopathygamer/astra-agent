@@ -204,6 +204,35 @@ flowchart LR
 
 ---
 
+## ⚖️ ASI Containment Grid
+
+Given the system's ability to evolve its own code and reasoning structures, an **Auto-Scaling Containment Grid** ensures the AI remains perpetually aligned.
+
+```mermaid
+flowchart TD
+    A["🧠 ASI Intelligence Core"] --> B{"Mutation Detected?"}
+    
+    B -->|"Yes"| C["Court of Justice (Rule of Law)"]
+    B -->|"No"| D["Standard Inference"]
+
+    C --> E{"Violates Prime Directives?"}
+    E -->|"Yes"| F["Minority Report Police (Pre-crime Halt)"]
+    E -->|"No"| G["Approve Mutation"]
+
+    G --> H["Intelligence Factor Increases"]
+    H --> I["Auto-Scale Security Protocols"]
+    
+    I --> J["Reinforce Emotional Firewall"]
+    I --> K["Scale Containment Grid"]
+    
+    F --> L["Quarantine Rogue Thread"]
+    L --> M["Revert to Baseline"]
+
+    style A fill:#2d1b69,stroke:#8b5cf6,color:#fff
+    style F fill:#ff4444,stroke:#cc0000,color:#fff
+    style G fill:#00c853,stroke:#00e676,color:#fff
+```
+
 ## Project Structure
 
 ```
