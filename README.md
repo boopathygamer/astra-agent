@@ -8,7 +8,7 @@
 </p>
 
 <h1 align="center">🌟 Astra Agent</h1>
-<h3 align="center">Universal Multi-Model AI Agent System with Autonomous Reasoning</h3>
+<h3 align="center">Automonous ASI System with Self Evolving ability</h3>
 
 <p align="center">
   A production-grade AI agent platform that unifies multiple LLM providers into a single, fault-tolerant intelligence layer. Featuring autonomous tool use, council-based consensus, fleet learning, real-time streaming, and a React-based PWA frontend.
