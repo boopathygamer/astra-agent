@@ -8,7 +8,7 @@
 </p>
 
 <h1 align="center">🌟 Astra Agent</h1>
-<h3 align="center">Universal Multi-Model AI Agent System with ASI Safety Architecture</h3>
+<h3 align="center">Autonomous ASI system with self evolving ability</h3>
 
 <p align="center">
   A production-grade AI agent platform featuring an Artificial Super Intelligence (ASI) safety architecture with multi-tiered containment, a multi-model LLM council, autonomous tool execution, fleet learning, and a React PWA frontend.
