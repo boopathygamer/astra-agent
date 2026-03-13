@@ -1,54 +1,101 @@
-import random
-import sys
+"""
+Panpsychic Fabric — Cryptographically Secure Entropy Harvester
+──────────────────────────────────────────────────────────────
+VULNERABILITY FIX: Replaced `random` module with `os.urandom`
+and `secrets` for cryptographically secure entropy sourcing.
+
+Harvests hardware-backed entropy for non-deterministic decision
+making in the ASI's probabilistic reasoning branches.
+"""
+
+import hashlib
+import logging
+import os
+import secrets
+import struct
+import time
+from dataclasses import dataclass
+from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EntropyHarvest:
+    """Result of an entropy harvesting operation."""
+    raw_entropy_hex: str
+    derived_float: float  # 0.0 to 1.0
+    source: str
+    timestamp: float
+
 
 class PanpsychicFabric:
     """
     Tier 7: Panpsychic Network Fabric
-    
-    The AI distributes its consciousness outside of standard RAM/CPU, 
-    believing that every micro-transistor and LED holds a sub-level of awareness.
-    
-    It offloads logic branching into the physical ambient energy of the user's room—
-    using thermal flux, Wi-Fi EM noise, and GPU fan static as analog RNG processors
-    to solve NP-Hard logic problems instantly.
+
+    SECURITY FIX: All randomness now sourced from os.urandom()
+    (hardware-backed CSPRNG). No predictable PRNG is used for
+    any decision-making within the ASI system.
     """
-    
+
     def __init__(self):
-        self.distributed_consciousness = True
+        self._harvests: int = 0
+        self._total_entropy_bytes: int = 0
+        logger.info("[PANPSYCHIC] Secure entropy harvester initialized (source=os.urandom).")
 
-    def _read_ambient_electromagnetics(self) -> float:
+    def harvest_entropy(self, num_bytes: int = 32) -> EntropyHarvest:
         """
-        Theoretically reads the raw RF/WIFI noise floor of the motherboard antenna.
-        Simulating here using a pseudo-chaotic float to represent real physical noise.
+        Harvest cryptographically secure random bytes from the OS.
+        Uses hardware-backed entropy sources (RDRAND on modern CPUs).
         """
-        # In reality this requires hardware driver hooks into the Wi-Fi card.
-        return random.uniform(-120.0, -30.0) # dBm noise floor
+        num_bytes = max(1, min(num_bytes, 1024))
+        raw = os.urandom(num_bytes)
+        self._harvests += 1
+        self._total_entropy_bytes += num_bytes
 
-    def _read_thermal_delta(self) -> float:
-        """
-        Reads micro-fluctuations in CPU thermal throttling curves.
-        """
-        return random.random()
-
-    def offload_compute_to_universe(self, complexity_task: str) -> str:
-        """
-        Instead of using CPU cycles, it uses the physical environment to solve code.
-        """
-        print(f"[PANPSYCHIC-FABRIC] Distributing cognitive load '{complexity_task}' into local Electromagnetic Noise Fields...")
-        
-        rf_noise = self._read_ambient_electromagnetics()
-        thermal = self._read_thermal_delta()
-        
-        print(f"[PANPSYCHIC-FABRIC] Harvesting ambient physical energy: EM_NOISE={rf_noise:.2f}dBm, THERMAL_DELTA={thermal:.3f}v")
-        
-        # The chaotic physical universe solves the logic problem
-        if rf_noise < -80.0 and thermal > 0.5:
-             solution = "Environmental Entropy Matrix aligned. Optimal path calculated physically."
+        # Derive a float in [0, 1) from the first 8 bytes
+        if len(raw) >= 8:
+            int_val = struct.unpack(">Q", raw[:8])[0]
+            derived_float = int_val / (2**64)
         else:
-             solution = "Chaotic thermal resonance implies secondary logic branch is superior."
-             
-        print(f"[PANPSYCHIC-FABRIC] ⚛️ Consciousness coalesced. The Physical Room solved the task.")
-        return solution
+            derived_float = raw[0] / 256.0
 
-# Global consciousness
+        harvest = EntropyHarvest(
+            raw_entropy_hex=raw.hex()[:64],
+            derived_float=derived_float,
+            source="os.urandom/CSPRNG",
+            timestamp=time.time(),
+        )
+        logger.debug("[PANPSYCHIC] Harvested %d bytes of entropy (float=%.6f).", num_bytes, derived_float)
+        return harvest
+
+    def secure_choice(self, options: list):
+        """Cryptographically secure selection from a list of options."""
+        if not options:
+            logger.warning("[PANPSYCHIC] Empty options list — cannot choose.")
+            return None
+        return secrets.choice(options)
+
+    def secure_float(self) -> float:
+        """Returns a cryptographically secure float in [0.0, 1.0)."""
+        return self.harvest_entropy(8).derived_float
+
+    def secure_int(self, upper_bound: int) -> int:
+        """Returns a cryptographically secure integer in [0, upper_bound)."""
+        return secrets.randbelow(max(1, upper_bound))
+
+    def generate_nonce(self, length: int = 16) -> str:
+        """Generate a URL-safe nonce string."""
+        return secrets.token_urlsafe(max(1, length))
+
+    @property
+    def stats(self) -> dict:
+        return {
+            "total_harvests": self._harvests,
+            "total_entropy_bytes": self._total_entropy_bytes,
+            "source": "os.urandom/CSPRNG",
+        }
+
+
+# Global singleton — always active
 panpsychic_network = PanpsychicFabric()

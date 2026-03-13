@@ -251,8 +251,10 @@ class MemoryManager:
         """Initialize ChromaDB for semantic similarity search."""
         try:
             import chromadb
+            from chromadb.config import Settings
             self._chroma_client = chromadb.PersistentClient(
-                path=str(self.persist_dir / "chroma")
+                path=str(self.persist_dir / "chroma"),
+                settings=Settings(anonymized_telemetry=False)
             )
             self._chroma_collection = self._chroma_client.get_or_create_collection(
                 name=self.config.memory_collection_name,

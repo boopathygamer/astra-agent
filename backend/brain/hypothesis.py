@@ -126,26 +126,42 @@ class HypothesisEngine:
         beta: Optional[float] = None,
     ) -> List[Hypothesis]:
         """
-        Update hypothesis weights based on new evidence.
-
-        Implements: p'_i ∝ p_i · exp(-β · Loss(h_i; E))
+        Quantum-Annealing Hypothesis Collapse
+        Update hypothesis weights based on Quantum Simulated Annealing over an energy landscape.
+        Implements: P = exp(-dE / T) where T decays over iterations.
 
         Args:
-            evidence: Dict mapping hypothesis_id → loss value (lower = better)
-            beta: Temperature parameter (higher = more aggressive updates)
+            evidence: Dict mapping hypothesis_id → energy/loss value (lower = better)
+            beta: Unused override (maintained for signature compatibility)
 
         Returns:
             Updated hypotheses
         """
-        beta = beta or self.config.hypothesis_temperature
+        # Mitigation: Limit annealing steps to avoid infinite loop DoS on landscape escapes
+        if self.iteration > 100:
+            logger.warning("Quantum-Annealing maximum iteration threshold (100) reached. Forcing collapse.")
+            self.prune_weak(threshold=0.5)
+            return self.hypotheses
+
+        # Temperature decays over iterations (cooling schedule for simulated annealing)
+        temperature = max(0.01, 1.0 / (1.0 + self.iteration * 0.5))
         min_weight = self.config.min_hypothesis_weight
 
         # Update weights
         for h in self.hypotheses:
             if h.id in evidence:
-                loss = evidence[h.id]
-                h.loss_history.append(loss)
-                h.weight *= math.exp(-beta * loss)
+                current_energy = evidence[h.id]
+                previous_energy = h.loss_history[-1] if h.loss_history else current_energy
+                dE = current_energy - previous_energy
+                
+                h.loss_history.append(current_energy)
+                
+                # Quantum tunneling / simulated annealing:
+                # Can probabilistically traverse worse energy states if temperature is high
+                if dE <= 0:
+                    h.weight *= math.exp(abs(dE) / temperature)
+                else:
+                    h.weight *= math.exp(-dE / temperature)
 
         # Normalize weights (Σ p'_i = 1)
         total_weight = sum(h.weight for h in self.hypotheses)
@@ -162,7 +178,7 @@ class HypothesisEngine:
 
         # Log weight distribution
         weight_dist = {h.id: f"{h.weight:.3f}" for h in self.hypotheses}
-        logger.info(f"Iteration {self.iteration}: weights = {weight_dist}")
+        logger.info(f"Quantum-Annealing Iteration {self.iteration} (T={temperature:.2f}): weights = {weight_dist}")
 
         return self.hypotheses
 

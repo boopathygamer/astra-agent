@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "start cmd /k \"cd /d ../backend && python main.py\" && timeout /t 3 /nobreak >nul && vite --port=3000 --host=0.0.0.0",
+    "dev": "npx -y concurrently -k -n BACK,FRONT -c cyan,green \"cd ../backend && python main.py\" \"npx vite --port=3000 --host=0.0.0.0\"",
     "dev:frontend": "vite --port=3000 --host=0.0.0.0",
+    "dev:backend": "cd ../backend && python main.py",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

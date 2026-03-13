@@ -1,59 +1,62 @@
 import asyncio
 import time
-import numpy as np
+import concurrent.futures
 from typing import List, Dict, Any, Optional
 
 class PredictivePrecomputer:
     """
-    Predictive Pre-computation (Zero-Latency Illusion)
-    Uses a probabilistic matrix (Markov chain/n-gram or light embedding distance)
-    to predict the user's next prompt while they are typing or thinking,
-    pre-fetching the context and triggering "shadow inferences" in the background.
+    Tachyon-State Predictive Execution Engine (Apparent Negative Latency)
+    Maintains parallel, shadowed "sandbox" execution states for the top predictive future events.
+    By utilizing thread-bound CPU limits, it synthesizes the hypothesis before the user finishes.
     """
     
-    def __init__(self):
-        self.shadow_threads = []
+    def __init__(self, max_workers: int = 50):
+        # Thread pool for zero-latency shadow executions
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
         self.precomputed_cache = {}
-        # Simple probabilistic transition matrix mapping recent context to likely next intents
         self.transition_matrix: Dict[str, Dict[str, float]] = {
             "write_code": {"run_test": 0.6, "add_comments": 0.3, "refactor": 0.1},
             "run_test": {"fix_error": 0.5, "commit_code": 0.4, "write_code": 0.1},
         }
 
-    async def start_shadow_inference(self, probable_intent: str, current_context: str):
-        """Simulates running the AI in the background to pre-compute an answer"""
-        # In a real heavy LLM, this would hit the API silently
+    def _sync_shadow_inference(self, probable_intent: str, current_context: str) -> Tuple[str, str]:
+        """Synchronous CPU-bound shadow execution."""
         start_time = time.time()
-        # Simulating compute time
-        await asyncio.sleep(0.1) 
-        
-        # Pre-compiled synthetic answer
+        # Simulate heavy CPU-bound hypothesis generation or LLM call
+        time.sleep(0.1) 
         precomputed_response = f"PRECOMPUTED[{probable_intent}] based on: {current_context[:20]}..."
-        
-        # Store in ultra-fast access map
-        self.precomputed_cache[probable_intent] = precomputed_response
         print(f"[PRE-COMPUTE] Shadow thread finished for intent: {probable_intent} in {time.time()-start_time:.3f}s")
-        
+        return probable_intent, precomputed_response
 
     async def analyze_and_predict(self, live_input_stream: str, current_state: str):
         """
         Called on keypress or idle ticks. 
-        Predicts top 3 intents and spins up shadow workers.
+        Predicts top 50 intents and spins up shadow workers via ThreadPoolExecutor.
         """
-        # Determine likely intent from current state
         probable_next = self.transition_matrix.get(current_state, {})
+        # Predict top 50 instead of 3 for ultra-performance coverage
+        top_intents = sorted(probable_next.items(), key=lambda x: x[1], reverse=True)[:50]
         
-        # Sort by highest probability
-        top_intents = sorted(probable_next.items(), key=lambda x: x[1], reverse=True)[:3]
-        
-        tasks = []
+        loop = asyncio.get_running_loop()
+        futures = []
         for intent, prob in top_intents:
             if intent not in self.precomputed_cache:
-                 tasks.append(self.start_shadow_inference(intent, live_input_stream))
+                 # Issue non-blocking thread execution
+                 future = loop.run_in_executor(
+                     self.executor, 
+                     self._sync_shadow_inference, 
+                     intent, 
+                     live_input_stream
+                 )
+                 futures.append(future)
                  
-        if tasks:
-            print(f"[PRE-COMPUTE] Launching {len(tasks)} shadow inferences for probability matrix...")
-            await asyncio.gather(*tasks)
+        if futures:
+            print(f"[PRE-COMPUTE] Launching {len(futures)} Tachyon shadow inferences...")
+            results = await asyncio.gather(*futures, return_exceptions=True)
+            for res in results:
+                if isinstance(res, tuple) and len(res) == 2:
+                    intent, response = res
+                    self.precomputed_cache[intent] = response
 
     def retrieve_instant_response(self, actual_intent: str) -> Optional[str]:
         """
@@ -62,9 +65,13 @@ class PredictivePrecomputer:
         """
         if actual_intent in self.precomputed_cache:
             resp = self.precomputed_cache.pop(actual_intent)
-            print(f"[PRE-COMPUTE] ⚡ ZERO LATENCY HIT for {actual_intent}")
+            print(f"[PRE-COMPUTE] ⚡ TACHYON ZERO LATENCY HIT for {actual_intent}")
             return resp
         return None
+
+    def shutdown(self):
+        """Cleanup thread pool to prevent DoS vulnerability/exhaustion"""
+        self.executor.shutdown(wait=False)
 
 # Singleton instance
 precompute_engine = PredictivePrecomputer()

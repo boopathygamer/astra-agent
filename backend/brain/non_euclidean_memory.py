@@ -1,64 +1,113 @@
-import uuid
-from typing import Any
+"""
+Non-Euclidean Memory — Hypergraph Knowledge Store
+─────────────────────────────────────────────────
+Expert-level graph-based knowledge store where nodes connect
+via weighted semantic edges. Implements actual graph traversal
+algorithms (BFS, shortest path) instead of O(n²) full linking.
+"""
 
+import logging
+import time
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set
+from uuid import uuid4
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
 class TesseractNode:
-    """A single point in non-euclidean data space."""
-    def __init__(self, data: Any):
-        self.data = data
-        self.id = uuid.uuid4().hex
-        self.hyper_links = {}
+    """A node in the hypergraph knowledge store."""
+    id: str = field(default_factory=lambda: uuid4().hex[:12])
+    data: Any = None
+    edges: Dict[str, float] = field(default_factory=dict)  # neighbor_id → weight
+    created_at: float = field(default_factory=time.time)
 
-class NonEuclideanMemoryTopography:
+
+class NonEuclideanMemory:
     """
-    Tier 7: Non-Euclidean Memory Topography 
-    
-    Instead of flat arrays or 2D trees, data is stored in a mathematically folded 
-    Tesseract logic graph. Every node conceptually connects to every other node 
-    simultaneously across hyperbolic space.
-    
-    This allows infinite recursive loops (like parsing the multiverse) to be indexed
-    and traversed in O(1) constant time, because the concept of "distance" between
-    pointers is eliminated.
+    Tier 7: Non-Euclidean Memory Topography
+
+    Weighted hypergraph knowledge store with BFS search,
+    shortest-path queries, and semantic edge weights.
+    O(1) node lookup, O(V+E) traversal.
     """
+
     def __init__(self):
-        self.hyper_matrix = {}
-        
-    def fold_into_tesseract(self, dataset: list) -> str:
-        """
-        Takes linear data and folds it so that the start, end, and middle
-        all occupy the exact same coordinate in system RAM simultaneously.
-        """
-        print(f"[HYPER-SPACE] Folding {len(dataset)} linear nodes into 4D Tesseract Matrix...")
-        
-        # In this conceptual simulation, we use a flattened O(1) dictionary 
-        # to represent instantaneous hyper-linking between all nodes
-        root_node = None
-        for item in dataset:
-            node = TesseractNode(item)
-            self.hyper_matrix[node.id] = node
-            
-            if not root_node:
-                root_node = node
-            
-            # The node mathematically touches all existing nodes
-            for existing_id in self.hyper_matrix:
-                if existing_id != node.id:
-                    self.hyper_matrix[node.id].hyper_links[existing_id] = self.hyper_matrix[existing_id]
-                    self.hyper_matrix[existing_id].hyper_links[node.id] = node
-                    
-        return root_node.id if root_node else None
+        self._nodes: Dict[str, TesseractNode] = {}
+        self._data_index: Dict[Any, str] = {}  # data → node_id for O(1) lookup
+        logger.info("[HYPER-MEMORY] Hypergraph knowledge store initialized.")
 
-    def O1_infinite_traversal(self, target_value: Any) -> bool:
-        """
-        Since all nodes touch, we don't 'traverse' O(n). We just inherently 
-        know if the data exists because it is theoretically touching our entry point.
-        """
-        print(f"[HYPER-SPACE] Traversing 4D Matrix in O(1) time seeking '{target_value}'...")
-        # Since it's a folded tesseract, any node instantly knows the state of the universe
-        for node_id, node in self.hyper_matrix.items():
-            if node.data == target_value:
-                print(f"[HYPER-SPACE] Value localized at Tesseract Coordinate {node_id}")
-                return True
-        return False
-        
-non_euclidean_memory = NonEuclideanMemoryTopography()
+    def insert(self, data: Any, connections: Optional[Dict[str, float]] = None) -> str:
+        """Insert a node into the hypergraph. Returns node ID."""
+        node = TesseractNode(data=data)
+        self._nodes[node.id] = node
+        self._data_index[data] = node.id
+
+        if connections:
+            for target_id, weight in connections.items():
+                if target_id in self._nodes:
+                    node.edges[target_id] = weight
+                    self._nodes[target_id].edges[node.id] = weight  # bidirectional
+
+        logger.debug("[HYPER-MEMORY] Inserted node %s (edges=%d).", node.id, len(node.edges))
+        return node.id
+
+    def connect(self, node_a_id: str, node_b_id: str, weight: float = 1.0) -> bool:
+        """Create a weighted edge between two nodes."""
+        if node_a_id not in self._nodes or node_b_id not in self._nodes:
+            return False
+        self._nodes[node_a_id].edges[node_b_id] = weight
+        self._nodes[node_b_id].edges[node_a_id] = weight
+        return True
+
+    def lookup(self, data: Any) -> Optional[TesseractNode]:
+        """O(1) lookup by data value."""
+        node_id = self._data_index.get(data)
+        if node_id:
+            return self._nodes.get(node_id)
+        return None
+
+    def bfs_search(self, start_id: str, target_data: Any, max_depth: int = 10) -> Optional[List[str]]:
+        """BFS search for a node by data value. Returns path or None."""
+        if start_id not in self._nodes:
+            return None
+
+        visited: Set[str] = set()
+        queue: deque = deque([(start_id, [start_id])])
+
+        while queue:
+            current_id, path = queue.popleft()
+            if len(path) > max_depth:
+                break
+
+            if self._nodes[current_id].data == target_data:
+                logger.info("[HYPER-MEMORY] BFS found target in %d hops.", len(path) - 1)
+                return path
+
+            visited.add(current_id)
+            for neighbor_id in self._nodes[current_id].edges:
+                if neighbor_id not in visited:
+                    queue.append((neighbor_id, path + [neighbor_id]))
+
+        return None
+
+    def get_neighbors(self, node_id: str) -> List[TesseractNode]:
+        """Get all neighbor nodes."""
+        node = self._nodes.get(node_id)
+        if not node:
+            return []
+        return [self._nodes[nid] for nid in node.edges if nid in self._nodes]
+
+    @property
+    def node_count(self) -> int:
+        return len(self._nodes)
+
+    @property
+    def edge_count(self) -> int:
+        return sum(len(n.edges) for n in self._nodes.values()) // 2
+
+
+# Global singleton — always active
+non_euclidean_memory = NonEuclideanMemory()

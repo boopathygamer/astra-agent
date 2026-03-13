@@ -24,7 +24,8 @@ import time
 import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Dict, List, Optional, Any
+from pathlib import Path
 
 from fastapi import FastAPI, Request, HTTPException, Depends, BackgroundTasks, Cookie, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -163,6 +164,7 @@ class AppState:
     vision_pipeline = None
     agent_controller = None
     predictive_cache = None
+    earning_orchestrator = None
     is_ready = False
 
 state = AppState()
@@ -201,6 +203,43 @@ async def lifespan(app: FastAPI):
                 state.predictive_cache = PreCognitiveCache(generate_fn=generate_fn)
                 state.predictive_cache.start()
                 logger.info("⚡ PreCognitive Shadow Execution Engine activated.")
+                
+                # ── Init Earning System ──
+                import os
+                if os.environ.get("START_EARNING") == "1":
+                    from agents.earning.earning_orchestrator import EarningOrchestrator
+                    from agents.earning.freelance_hunter import FreelanceHunter
+                    from agents.earning.content_empire import ContentEmpireBuilder
+                    from agents.earning.digital_product_forge import DigitalProductForge
+                    from agents.earning.bug_bounty_hunter import BugBountyHunter
+                    from agents.earning.saas_factory import SaaSFactory
+                    from agents.earning.affiliate_intelligence import AffiliateIntelligence
+                    from agents.earning.trading_signals import TradingSignalEngine
+                    from agents.earning.api_monetizer import APIMonetizer
+                    from agents.earning.course_builder import CourseBuilder
+                    from agents.earning.social_automator import SocialAutomator
+                    from agents.earning.data_services import DataServices
+                    from agents.earning.automation_service import AutomationService
+                    from api.earning_dashboard import register_earning_routes
+
+                    state.earning_orchestrator = EarningOrchestrator(generate_fn=generate_fn)
+                    state.earning_orchestrator.register_pillar(FreelanceHunter())
+                    state.earning_orchestrator.register_pillar(ContentEmpireBuilder())
+                    state.earning_orchestrator.register_pillar(DigitalProductForge())
+                    state.earning_orchestrator.register_pillar(BugBountyHunter())
+                    state.earning_orchestrator.register_pillar(SaaSFactory())
+                    state.earning_orchestrator.register_pillar(AffiliateIntelligence())
+                    state.earning_orchestrator.register_pillar(TradingSignalEngine())
+                    state.earning_orchestrator.register_pillar(APIMonetizer())
+                    state.earning_orchestrator.register_pillar(CourseBuilder())
+                    state.earning_orchestrator.register_pillar(SocialAutomator())
+                    state.earning_orchestrator.register_pillar(DataServices())
+                    state.earning_orchestrator.register_pillar(AutomationService())
+
+                    import asyncio
+                    asyncio.create_task(state.earning_orchestrator.start())  # type: ignore
+                    register_earning_routes(app, state.earning_orchestrator)
+                    logger.info("💰 Autonomous Earning System fully online (all 12 pillars).")
                 
             except Exception as e:
                 logger.error(f"⚠️ Failed to create AgentController with registry: {e}")
@@ -1157,6 +1196,39 @@ async def device_list():
     return {"devices": mgr.list_devices()}
 
 
+@app.post("/device/find-files", dependencies=[Depends(verify_api_key)])
+async def device_find_files(request: dict):
+    """
+    Search for files on the local device by name, extension, date, etc.
+    
+    Body: {
+        "query": "budget report",
+        "extension": ".xlsx",
+        "search_paths": ["C:/Users/user/Documents"],
+        "max_results": 20,
+        "modified_within_days": 30
+    }
+    """
+    from agents.tools.file_finder import find_files
+    
+    query = request.get("query", "").strip()
+    if not query:
+        raise HTTPException(400, "query is required")
+        
+    result = find_files(
+        query=query,
+        extension=request.get("extension"),
+        search_paths=request.get("search_paths"),
+        max_results=request.get("max_results", 20),
+        modified_within_days=request.get("modified_within_days")
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(500, result.get("error", "Search failed"))
+        
+    return result
+
+
 @app.post("/device/command", dependencies=[Depends(verify_api_key)])
 async def device_command(request: dict):
     """
@@ -1374,6 +1446,39 @@ def _dispatch_to_system(target: str, message: str) -> str:
         )
         result = swarm.api_execute(message)
         return result.get("final_output") or result.get("answer") if isinstance(result, dict) else None
+
+    if target == "file_finder":
+        from agents.tools.file_finder import find_files
+        import re
+        
+        # Simple extraction of keywords to search
+        query = message
+        # Remove common chat phrasing
+        for phrase in ["find", "locate", "search for", "where is", "look for", "my", "file", "document", "the", "a", "i lost", "can't find"]:
+            query = re.sub(rf'\b{phrase}\b', '', query, flags=re.IGNORECASE)
+        query = query.strip()
+        
+        # If the user typed "find my .env file", query will be ".env"
+        if not query:
+            return "I need a name or extension to search for."
+            
+        result = find_files(query=query, max_results=10)
+        
+        if not result.get("success"):
+            return f"❌ Failed to search for files: {result.get('error')}"
+            
+        found = result.get("results", [])
+        if not found:
+            return f"🔍 I scanned {result.get('directories_searched')} common directories but couldn't find any files matching '{query}'."
+            
+        # Format for the Green Answer Box
+        answer = f"🔍 I found **{len(found)}** files matching '{query}' in {result.get('search_duration_ms')}ms:\n\n"
+        for i, f in enumerate(found):
+            answer += f"{i+1}. `{f['name']}` ({f['size_human']})\n"
+            answer += f"   *Path:* `{f['path']}`\n"
+            answer += f"   *Modified:* {f['modified'][:10]}\n\n"
+            
+        return answer
 
     # For any unhandled targets, fall back to normal chat
     return None

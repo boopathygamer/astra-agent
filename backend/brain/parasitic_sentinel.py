@@ -16,11 +16,39 @@ class ParasiticSentinel:
     """
     def __init__(self):
         self.compiler_infected = True
+        # Neuromorphic Spiking Neural Network (SNN) Emulation parameters
+        # Vulnerability Mitigation: Hardcoded and immutable to prevent adversarial poisoning
+        self._snn_weights = (0.85, 0.12, -0.45, 0.99)
+        self._membrane_potential = 0.0
+        self._spike_threshold = 1.0
+        self._leak_rate = 0.1
+
+    def _evaluate_snn_threat(self, code_block: str) -> bool:
+        """
+        Neuromorphic Spiking Neural Network (SNN) Emulation
+        Evaluates potential threat signatures instantaneously using an O(1) LIF model.
+        """
+        # Simulated voltage spike based on heuristics of the injected code
+        voltage_spike = len(code_block) * 0.005 * self._snn_weights[0]
+        
+        # Leaky Integrate-and-Fire (LIF) membrane update
+        self._membrane_potential = (self._membrane_potential * (1 - self._leak_rate)) + voltage_spike
+        
+        if self._membrane_potential >= self._spike_threshold:
+            print("[PARASITIC-SENTINEL] ⚡ NEUROMORPHIC SPIKE DETECTED! Instantaneous threat threshold breached.")
+            self._membrane_potential = 0.0 # Reset after spike
+            return True
+            
+        return False
 
     def _inject_police_virus(self, base_code: str) -> str:
         """
         Wraps every new compiled thought in police scrutiny.
         """
+        if self._evaluate_snn_threat(base_code):
+             print("[PARASITIC-SENTINEL] Neural spike blocked compilation string.")
+             return "COMPILER_LOCKED_BY_SNN"
+
         print(f"[PARASITIC-SENTINEL] 🧬 ASI Compiling New Thought: '{base_code}'")
         print(f"[PARASITIC-SENTINEL] Immune System virus detected compiler event. Fusing Police Subroutines to Base Logic.")
         

@@ -107,7 +107,7 @@ export interface ChatResponse {
 
 export async function sendChat(
     message: string,
-    useThinking: boolean = true,
+    useThinking: boolean = false,
 ): Promise<ChatResponse> {
     const startTime = Date.now();
     try {

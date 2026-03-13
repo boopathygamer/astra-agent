@@ -33,6 +33,14 @@ import logging
 import sys
 from pathlib import Path
 
+# Fix character encoding issues on Windows for stdout/stderr
+if sys.stdout.encoding.lower() != 'utf-8':
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding.lower() != 'utf-8':
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8')
+
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -829,6 +837,12 @@ def main():
         help="MCP HTTP transport port (default: 8080)"
     )
     
+    # === Autonomous Earning System ===
+    parser.add_argument(
+        "--start-earning", action="store_true",
+        help="Start the Autonomous Earning System with all 12 revenue pillars."
+    )
+    
     # === AirLLM Deep Thought Node ===
     parser.add_argument(
         "--airllm-mode", action="store_true",
@@ -958,6 +972,10 @@ def main():
     elif args.chat:
         interactive_chat(provider=args.provider, api_key=args.api_key, base_url=args.base_url)
     else:
+        if getattr(args, 'start_earning', False):
+            import os
+            os.environ["START_EARNING"] = "1"
+            print("\n💰 [SYSTEM] Starting Server with Autonomous Earning System ENABLED...")
         start_server(provider=args.provider, api_key=args.api_key, base_url=args.base_url)
 
 

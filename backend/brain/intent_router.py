@@ -109,6 +109,10 @@ _p(r'\b(?:teach\s*me|tutor|explain\s*(?:like|as\s*if)|socratic|learn(?:ing)?\s*(
 _p(r'\b(?:swarm\s*(?:intelligence|task)|multi[- ]?agent\s*swarm|deploy\s*(?:agent\s*)?swarm)\b', "swarm", 0.88, "Swarm Intelligence", "🐝")
 
 
+# ── Local File Finder ──
+_p(r'\b(?:find|locate|search\s*for|where\s*is|look\s*for)\b.*\b(?:file|document|my\s*(?:resume|report|image|picture|video|code)|folder|directory)\b', "file_finder", 0.88, "File Finder", "🔍")
+_p(r'\b(?:i\s*lost\s*(?:a|my)\s*file|can.?t\s*find\s*(?:a|my)\s*file)\b', "file_finder", 0.90, "File Finder", "🔍")
+
 class IntentRouter:
     """
     Classifies user queries to route them to the appropriate backend system.
