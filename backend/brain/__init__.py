@@ -18,3 +18,17 @@ from .synaptic_tool_chain import SynapticChain, ChainBuilder
 from .cognitive_eeg_balancer import CognitiveEEGBalancer
 from .temporal_code_versioning import TemporalVersionTree
 from .zero_latency_prerender import ZeroLatencyPreRenderEngine
+
+# Next-Gen Architecture Upgrade Modules
+from .consciousness_kernel import ConsciousnessKernel
+from .neural_plasticity_router import NeuralPlasticityRouter
+from .cognitive_genome import CognitiveGenomeSystem
+from .dimensional_context_fold import DimensionalContextFolder
+from .swarm_intelligence_mesh import SwarmIntelligenceMesh
+from .thought_crystallizer import ThoughtCrystallizer
+from .phantom_computation import PhantomComputationLayer
+from .cognitive_metabolism import CognitiveMetabolism
+from .omniscient_weaver import KnowledgeFabric
+from .architecture_compiler import ArchitectureCompiler
+from .temporal_paradox_resolver import TemporalParadoxResolver
+from .neural_symbiote_bridge import NeuralSymbioteBridge
