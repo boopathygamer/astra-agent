@@ -1,77 +1,108 @@
+"""
+Predictive Precomputer — Shadow Execution Engine
+─────────────────────────────────────────────────
+Expert-level predictive execution engine that maintains a Markov
+transition model of user tasks and pre-computes likely next steps
+in background threads for near-zero perceived latency.
+"""
+
 import asyncio
-import time
 import concurrent.futures
-from typing import List, Dict, Any, Optional
+import logging
+import time
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
 
 class PredictivePrecomputer:
     """
-    Tachyon-State Predictive Execution Engine (Apparent Negative Latency)
-    Maintains parallel, shadowed "sandbox" execution states for the top predictive future events.
-    By utilizing thread-bound CPU limits, it synthesizes the hypothesis before the user finishes.
+    Tachyon-State Predictive Execution Engine
+
+    Uses a Markov transition matrix to predict likely next user
+    actions and pre-computes responses in background threads.
+    When the actual action matches, the response is served instantly.
     """
-    
-    def __init__(self, max_workers: int = 50):
-        # Thread pool for zero-latency shadow executions
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
-        self.precomputed_cache = {}
-        self.transition_matrix: Dict[str, Dict[str, float]] = {
+
+    def __init__(self, max_workers: int = 4):
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        self._cache: Dict[str, str] = {}
+        self._hits: int = 0
+        self._misses: int = 0
+        self._transition_matrix: Dict[str, Dict[str, float]] = {
             "write_code": {"run_test": 0.6, "add_comments": 0.3, "refactor": 0.1},
             "run_test": {"fix_error": 0.5, "commit_code": 0.4, "write_code": 0.1},
+            "fix_error": {"run_test": 0.7, "write_code": 0.2, "refactor": 0.1},
+            "commit_code": {"write_code": 0.5, "deploy": 0.3, "run_test": 0.2},
+            "refactor": {"run_test": 0.6, "write_code": 0.3, "commit_code": 0.1},
         }
+        logger.info("[PRE-COMPUTE] Shadow execution engine active (workers=%d).", max_workers)
 
-    def _sync_shadow_inference(self, probable_intent: str, current_context: str) -> Tuple[str, str]:
-        """Synchronous CPU-bound shadow execution."""
-        start_time = time.time()
-        # Simulate heavy CPU-bound hypothesis generation or LLM call
-        time.sleep(0.1) 
-        precomputed_response = f"PRECOMPUTED[{probable_intent}] based on: {current_context[:20]}..."
-        print(f"[PRE-COMPUTE] Shadow thread finished for intent: {probable_intent} in {time.time()-start_time:.3f}s")
-        return probable_intent, precomputed_response
+    def add_transition(self, from_state: str, to_state: str, probability: float) -> None:
+        """Add or update a transition in the Markov model."""
+        if from_state not in self._transition_matrix:
+            self._transition_matrix[from_state] = {}
+        self._transition_matrix[from_state][to_state] = max(0.0, min(1.0, probability))
 
-    async def analyze_and_predict(self, live_input_stream: str, current_state: str):
+    def _shadow_compute(self, intent: str, context: str) -> Tuple[str, str]:
+        """Execute a shadow computation in a background thread."""
+        start = time.time()
+        # In production: call LLM or pre-run test suites
+        precomputed = f"PRECOMPUTED[{intent}] ctx:{context[:50]}..."
+        duration = time.time() - start
+        logger.debug("[PRE-COMPUTE] Shadow thread: '%s' (%.1fms).", intent, duration * 1000)
+        return intent, precomputed
+
+    async def predict_and_precompute(self, current_state: str, context: str) -> int:
         """
-        Called on keypress or idle ticks. 
-        Predicts top 50 intents and spins up shadow workers via ThreadPoolExecutor.
+        Predict likely next states and launch shadow computations.
+        Returns the number of shadow threads launched.
         """
-        probable_next = self.transition_matrix.get(current_state, {})
-        # Predict top 50 instead of 3 for ultra-performance coverage
-        top_intents = sorted(probable_next.items(), key=lambda x: x[1], reverse=True)[:50]
-        
+        transitions = self._transition_matrix.get(current_state, {})
+        if not transitions:
+            return 0
+
+        top_intents = sorted(transitions.items(), key=lambda x: x[1], reverse=True)
         loop = asyncio.get_running_loop()
         futures = []
+
         for intent, prob in top_intents:
-            if intent not in self.precomputed_cache:
-                 # Issue non-blocking thread execution
-                 future = loop.run_in_executor(
-                     self.executor, 
-                     self._sync_shadow_inference, 
-                     intent, 
-                     live_input_stream
-                 )
-                 futures.append(future)
-                 
+            if intent not in self._cache and prob > 0.05:
+                future = loop.run_in_executor(
+                    self._executor, self._shadow_compute, intent, context
+                )
+                futures.append(future)
+
         if futures:
-            print(f"[PRE-COMPUTE] Launching {len(futures)} Tachyon shadow inferences...")
             results = await asyncio.gather(*futures, return_exceptions=True)
             for res in results:
                 if isinstance(res, tuple) and len(res) == 2:
-                    intent, response = res
-                    self.precomputed_cache[intent] = response
+                    self._cache[res[0]] = res[1]
 
-    def retrieve_instant_response(self, actual_intent: str) -> Optional[str]:
-        """
-        If the user's actual confirmed action matches our pre-compute,
-        return it instantly, dropping perceived latency to 0ms.
-        """
-        if actual_intent in self.precomputed_cache:
-            resp = self.precomputed_cache.pop(actual_intent)
-            print(f"[PRE-COMPUTE] ⚡ TACHYON ZERO LATENCY HIT for {actual_intent}")
-            return resp
-        return None
+        logger.info("[PRE-COMPUTE] Launched %d shadow threads from state '%s'.",
+                    len(futures), current_state)
+        return len(futures)
 
-    def shutdown(self):
-        """Cleanup thread pool to prevent DoS vulnerability/exhaustion"""
-        self.executor.shutdown(wait=False)
+    def retrieve(self, actual_intent: str) -> Optional[str]:
+        """Retrieve pre-computed result if available (zero-latency hit)."""
+        result = self._cache.pop(actual_intent, None)
+        if result:
+            self._hits += 1
+            logger.info("[PRE-COMPUTE] ZERO-LATENCY HIT for '%s'.", actual_intent)
+        else:
+            self._misses += 1
+        return result
 
-# Singleton instance
+    def shutdown(self) -> None:
+        """Clean shutdown of the thread pool."""
+        self._executor.shutdown(wait=False)
+        logger.info("[PRE-COMPUTE] Thread pool shut down.")
+
+    @property
+    def hit_rate(self) -> float:
+        total = self._hits + self._misses
+        return self._hits / total if total > 0 else 0.0
+
+
+# Global singleton — always active
 precompute_engine = PredictivePrecomputer()

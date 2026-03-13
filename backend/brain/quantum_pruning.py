@@ -1,85 +1,109 @@
+"""
+Quantum Pathway Pruner — Simulated Annealing Branch Selector
+────────────────────────────────────────────────────────────
+Expert-level Tree-of-Thoughts branch pruner using simulated
+annealing with Metropolis-Hastings acceptance. Evaluates
+code quality heuristics to prune dead-end logic branches.
+"""
+
+import logging
 import math
-import random
-from typing import List, Dict, Any
+import secrets
+from typing import Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
+
 
 class QuantumPathwayPruner:
     """
     Quantum-Inspired Pathway Pruning (Tree-of-Thoughts Collapse)
-    Uses a simulated quantum annealing mathematical function to instantly evaluate
-    and "collapse" dead-end logic branches in a Tree of Thoughts before they
-    are run through the heavy semantic AI parser.
+
+    Uses simulated annealing to evaluate and prune dead-end logic
+    branches before they consume LLM tokens. Applies lightweight
+    heuristic energy scoring + Metropolis-Hastings acceptance.
     """
-    
-    def __init__(self):
-        self.initial_temperature = 100.0
-        self.cooling_rate = 0.95
-        
-    def _calculate_energy_cost(self, logic_branch: str) -> float:
-        """
-        A highly specialized, lightweight heuristic function.
-        Lower energy == better/more likely solution.
-        In reality, this would use a fast ridge regression or tiny embedding model.
-        """
+
+    _BAD_PATTERNS = ("syntax error", "infinite loop", "undefined", "notimplemented",
+                     "todo", "fixme", "hack", "xxx")
+    _GOOD_PATTERNS = ("return", "yield", "try", "except", "class", "def",
+                      "async", "await", "import", "logging")
+
+    def __init__(self, initial_temp: float = 100.0, cooling_rate: float = 0.95):
+        self._initial_temp = max(1.0, initial_temp)
+        self._cooling_rate = max(0.01, min(0.99, cooling_rate))
+        self._total_pruned: int = 0
+        self._total_evaluated: int = 0
+        logger.info("[QUANTUM-PRUNER] Annealing pruner active (T=%.1f, cooling=%.2f).",
+                     initial_temp, cooling_rate)
+
+    def _calculate_energy(self, branch: str) -> float:
+        """Heuristic energy function. Lower energy = better solution."""
         energy = 100.0
-        
-        # Penalize syntax errors or hallmark bad logic words instantly
-        bad_patterns = ["syntax error", "infinite loop", "undefined", "pass", "NotImplemented"]
-        for p in bad_patterns:
-            if p in logic_branch.lower():
+        lower = branch.lower()
+
+        for p in self._BAD_PATTERNS:
+            if p in lower:
                 energy += 50.0
-                
-        # Reward solid structural elements
-        good_patterns = ["return", "yield", "try", "except", "class", "def"]
-        for p in good_patterns:
-            if p in logic_branch.lower():
+
+        for p in self._GOOD_PATTERNS:
+            if p in lower:
                 energy -= 10.0
-                
-        # Base complexity penalty (too long = higher energy)
-        energy += len(logic_branch) * 0.01
-        
-        return max(1.0, energy) # Floor at 1.0
+
+        # Complexity penalty
+        energy += len(branch) * 0.01
+        # Empty penalty
+        if len(branch.strip()) < 10:
+            energy += 100.0
+
+        return max(1.0, energy)
 
     def prune_branches(self, thought_branches: List[str]) -> List[str]:
         """
-        Runs the simulated quantum annealing to instantly collapse the wave function
-        of possible thoughts down to only the mathematically viable ones.
+        Prune dead-end branches using simulated annealing.
+        Always keeps the best branch; others survive based on
+        Metropolis-Hastings probability.
         """
         if not thought_branches:
             return []
-            
-        print(f"[QUANTUM PRUNER] Analyzing {len(thought_branches)} logic branches in superposition...")
-        
-        branch_energies = [(branch, self._calculate_energy_cost(branch)) for branch in thought_branches]
-        
-        # Sort by lowest energy (best solutions)
-        branch_energies.sort(key=lambda x: x[1])
-        
-        current_temp = self.initial_temperature
-        surviving_branches = []
-        
-        # Simulate the quantum tunneling effect where we might keep a slightly worse
-        # branch early on to avoid local minima, but aggressively prune as temp drops
-        for branch, energy in branch_energies:
-            if len(surviving_branches) == 0:
-                surviving_branches.append(branch) # Always keep the absolute best
-                continue
-                
-            best_energy = branch_energies[0][1]
-            energy_diff = energy - best_energy
-            
-            # Quantum tunneling probability (Metropolis-Hastings criterion)
-            # e^(-deltaE / T)
-            tunnel_prob = math.exp(-energy_diff / current_temp)
-            
-            if random.random() < tunnel_prob:
-                surviving_branches.append(branch)
-                
-            current_temp *= self.cooling_rate
-            
-        collapsed_count = len(thought_branches) - len(surviving_branches)
-        print(f"[QUANTUM PRUNER] Wave function collapsed. Pruned {collapsed_count} dead-end branches instantly.")
-        
-        return surviving_branches
 
-# Global pruner
+        self._total_evaluated += len(thought_branches)
+
+        # Score all branches
+        scored: List[Tuple[str, float]] = [
+            (b, self._calculate_energy(b)) for b in thought_branches
+        ]
+        scored.sort(key=lambda x: x[1])
+
+        best_energy = scored[0][1]
+        survivors: List[str] = [scored[0][0]]  # Always keep the best
+        temp = self._initial_temp
+
+        for branch, energy in scored[1:]:
+            delta = energy - best_energy
+            # Metropolis-Hastings acceptance criterion
+            if delta <= 0:
+                acceptance_prob = 1.0
+            else:
+                acceptance_prob = math.exp(-delta / max(temp, 0.001))
+
+            # Use secrets for non-predictable randomness
+            threshold = secrets.randbelow(1000) / 1000.0
+            if threshold < acceptance_prob:
+                survivors.append(branch)
+
+            temp *= self._cooling_rate
+
+        pruned = len(thought_branches) - len(survivors)
+        self._total_pruned += pruned
+        logger.info("[QUANTUM-PRUNER] Pruned %d/%d branches (kept %d survivors).",
+                     pruned, len(thought_branches), len(survivors))
+
+        return survivors
+
+    @property
+    def stats(self) -> dict:
+        return {"evaluated": self._total_evaluated, "pruned": self._total_pruned}
+
+
+# Global singleton — always active
 quantum_pruner = QuantumPathwayPruner()

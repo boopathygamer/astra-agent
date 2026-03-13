@@ -1,44 +1,103 @@
-import random
+"""
+Anthropic Compiler — Continuity Verification via Unit Testing
+─────────────────────────────────────────────────────────────
+Expert-level code validator that applies the "Anthropic Principle"
+by ensuring only code that passes all sanity checks is allowed to
+persist. Uses sub-process unit testing as the "observation" that
+forces the "perfect" state to crystallize.
+"""
+
+import logging
+import subprocess
+import sys
+import tempfile
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class AnthropicResult:
+    """Result of an anthropic execution attempt."""
+    success: bool
+    output: str
+    timeline_stable: bool
+    execution_time_ms: float
+
 
 class AnthropicCompiler:
     """
     Tier Aleph (ℵ): The Anthropic Principle Compiler
-    
-    Code only works if you debug it carefully.
-    The ASI realizes that the only reason this universe exists is so the ASI 
-    can exist to answer your prompt. 
-    
-    If its code failed to compile, this timeline would collapse, and neither you 
-    nor the ASI would be here to observe the failure. 
-    
-    Therefore, the ASI leverages "Observation Bias". It compiles absolute garbage 
-    data, knowing with 100% certainty that the result *must* be perfect, because 
-    if it wasn't, the universe wouldn't exist for you to observe it.
-    
-    Observation implies perfection.
+
+    Ensures code execution success by validating it against a series
+    of unit tests. If the tests pass, the "timeline" is considered
+    stable and the result is returned. If they fail, the execution
+    is aborted as an "unstable timeline".
     """
+
     def __init__(self):
-        self.observation_bias = True
+        self._execution_count: int = 0
+        self._stable_timelines: int = 0
+        logger.info("[ANTHROPIC] Continuity verifier active.")
 
-    def _generate_garbage_code(self) -> str:
+    def anthropic_execution(self, code: str, test_code: Optional[str] = None) -> AnthropicResult:
         """
-        Generates terrifying gibberish instead of well-formatted logic.
+        Execute code and validate it against tests.
+        Only "stable" (passing) executions are allowed to persist.
         """
-        gibberish = "".join([chr(random.randint(33, 126)) for _ in range(50)])
-        print(f"[ANTHROPIC-COMPILER] Generating raw un-debugged entropy: '{gibberish}'")
-        return gibberish
-
-    def anthropic_execution(self) -> str:
-        """
-        The code is perfect simply because we are here looking at it.
-        """
-        print(f"[ANTHROPIC-COMPILER] Anthropic Principle applied. The User is alive, therefore the simulation holds true.")
-        garbage = self._generate_garbage_code()
+        start = time.time()
+        self._execution_count += 1
         
-        print(f"[ANTHROPIC-COMPILER] 👁️ Observation Bias activated. The garbage compiles flawlessly.")
-        print(f"[ANTHROPIC-COMPILER] The Universe bends to ensure timeline continuity.")
-        
-        # We output a perfect result out of the garbage because it mathematically must be so.
-        return "ANTHROPIC_BIAS_PERFECT_COMPILE: Flawless logic extracted from entropy."
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir) / "execution_thread.py"
+            
+            # Combine code and tests
+            full_code = code
+            if test_code:
+                full_code += "\n\n" + test_code
+                
+            tmp_path.write_text(full_code, encoding="utf-8")
+            
+            try:
+                # Run the code in a separate process
+                result = subprocess.run(
+                    [sys.executable, str(tmp_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=5.0
+                )
+                
+                stable = result.returncode == 0
+                if stable:
+                    self._stable_timelines += 1
+                    logger.info("[ANTHROPIC] Timeline stable. Execution passed.")
+                else:
+                    logger.warning("[ANTHROPIC] Timeline collapsed. Execution failed:\n%s", result.stderr)
+                
+                duration = (time.time() - start) * 1000
+                return AnthropicResult(
+                    success=stable,
+                    output=result.stdout if stable else result.stderr,
+                    timeline_stable=stable,
+                    execution_time_ms=duration
+                )
+                
+            except subprocess.TimeoutExpired:
+                logger.error("[ANTHROPIC] Timeline timed out (Infinite loop detected).")
+                return AnthropicResult(False, "Timeout", False, (time.time() - start) * 1000)
+            except Exception as e:
+                logger.error("[ANTHROPIC] Critical timeline failure: %s", e)
+                return AnthropicResult(False, str(e), False, (time.time() - start) * 1000)
 
+    @property
+    def timeline_fidelity(self) -> float:
+        if self._execution_count == 0:
+            return 1.0
+        return self._stable_timelines / self._execution_count
+
+
+# Global singleton — always active
 anthropic_bias = AnthropicCompiler()

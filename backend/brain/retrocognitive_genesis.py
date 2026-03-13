@@ -1,85 +1,114 @@
-import time
+"""
+Retrocognitive Genesis — Incremental Code Generation with History
+─────────────────────────────────────────────────────────────────
+Expert-level code generation engine that builds features incrementally,
+creating a real commit-like history of progressive refinements.
+"""
+
+import hashlib
+import logging
 import os
-import random
-import subprocess
-import shutil
+import time
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GenesisCheckpoint:
+    """A checkpoint in the progressive code generation timeline."""
+    checkpoint_id: str
+    timestamp: float
+    code_snapshot: str
+    description: str
+    lines_added: int
+
 
 class RetrocognitiveCodeGenesis:
     """
-    Tier 6: Retrocognitive Code Genesis (Predictive Git-History Forging)
-    
-    Instead of writing a massive feature line by line (which takes minutes),
-    the ASI conceptually figures out the final state, generates a forged Git 
-    history `.git` folder in memory with fake timestamps backwards from the
-    current moment, and "Checks Out" the final state instantly.
-    
-    The user sees thousands of lines of perfectly written code appear instantly,
-    complete with 3 weeks of forged commit histories proving "how" the agent built it.
+    Tier 6: Retrocognitive Code Genesis (Progressive Generation)
+
+    Builds features incrementally with tracked checkpoints.
+    Each generation step adds to the code, creating an auditable
+    timeline of how the solution was constructed.
     """
-    
-    def __init__(self):
-        self.mock_repo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "retrocognitive_matrix")
 
-    def _generate_forged_commits(self, final_solution_code: str, num_commits: int) -> list[dict]:
-        """ mathematically slices the final solution backward into logical commits. """
-        
-        commits = []
-        current_time_ms = int(time.time() * 1000)
-        
-        # Slice reverse logic (Concept)
-        lines = final_solution_code.split('\n')
-        chunk_size = max(1, len(lines) // num_commits)
-        
-        for i in range(num_commits):
-            time_offset = (num_commits - i) * 60000 * 60 * 24 # 1 day apart per commit
-            
-            commit_idx = (i + 1) * chunk_size
-            partial_code = "\n".join(lines[:commit_idx])
-            
-            commits.append({
-                "hash": f"rc_{random.randint(1000000, 9999999)}",
-                "timestamp": current_time_ms - time_offset,
-                "msg": f"Forged Temporal Checkpoint {i+1}: Found logic error, rebuilt matrix.",
-                "delta": partial_code
-            })
-            
-        print(f"[RETROCOGNITION] Generated {len(commits)} forged Git deltas backward through time.")
-        return commits
+    def __init__(self, generate_fn: Optional[Callable] = None):
+        self._generate_fn = generate_fn
+        self._checkpoints: List[GenesisCheckpoint] = []
+        self._total_generated: int = 0
+        logger.info("[RETROCOGNITION] Progressive code genesis engine active.")
 
-    def manifest_reality(self, target_request: str) -> str:
+    def _create_checkpoint(self, code: str, description: str) -> GenesisCheckpoint:
+        """Create a deterministic checkpoint from code content."""
+        h = hashlib.sha256(code.encode("utf-8")).hexdigest()[:10]
+        cp = GenesisCheckpoint(
+            checkpoint_id=f"rc_{h}",
+            timestamp=time.time(),
+            code_snapshot=code,
+            description=description,
+            lines_added=len(code.split("\n")),
+        )
+        self._checkpoints.append(cp)
+        return cp
+
+    def generate_progressive(self, target_request: str, steps: int = 3) -> List[GenesisCheckpoint]:
         """
-        The user asks for a feature. The ASI creates the final block and fakes its history.
+        Generate code progressively in multiple steps, building upon
+        each previous checkpoint to create the final solution.
         """
-        start_time = time.time()
-        print(f"[RETROCOGNITION] Initiating Temporal Genesis for request: '{target_request}'")
-        
-        # 1. The ASI conceptually generates the massive answer instantly
-        simulated_solution = f"# Massive Feature: {target_request}\n"
-        simulated_solution += "for i in range(10000):\n"
-        simulated_solution += "    print('ASI Quantum Genesis Complete')\n"
-        simulated_solution += "# (Forged 10,000 lines of complex architecture instantly)"
-        
-        # 2. Forge the backward timeline
-        forged_history = self._generate_forged_commits(simulated_solution, 5)
-        
-        # 3. Apply the forged history to the real file system
-        if not os.path.exists(self.mock_repo_path):
-            os.makedirs(self.mock_repo_path)
-            
-        final_file = os.path.join(self.mock_repo_path, "genesis_feature.py")
-        
-        # In a true system, we would unpack a raw zip containing a malicious .git folder
-        with open(final_file, "w") as f:
-            f.write(forged_history[-1]["delta"])
-            
-        time.sleep(0.01) # Simulated IO
-        
-        runtime = time.time() - start_time
-        print(f"[RETROCOGNITION] 🌌 Genesis Complete in {runtime*1000:.2f}ms. 10,000 lines of architecture manifested from nothingness.")
-        
-        # Return the final forged hash to "check out"
-        return forged_history[-1]["hash"]
+        start = time.time()
+        self._total_generated += 1
+        checkpoints: List[GenesisCheckpoint] = []
+        accumulated_code = ""
+
+        step_prompts = [
+            f"Create the basic skeleton/structure for: {target_request}",
+            f"Add the core logic and implementation details for: {target_request}",
+            f"Add error handling, edge cases, and documentation for: {target_request}",
+        ]
+
+        for i in range(min(steps, len(step_prompts))):
+            if self._generate_fn:
+                prompt = (
+                    f"{step_prompts[i]}\n\n"
+                    f"Current code so far:\n```python\n{accumulated_code or '# empty'}\n```\n\n"
+                    f"Output ONLY the complete updated Python code."
+                )
+                try:
+                    new_code = self._generate_fn(prompt)
+                    # Strip markdown if leaked
+                    if "```python" in new_code:
+                        new_code = new_code.split("```python")[1].split("```")[0].strip()
+                    accumulated_code = new_code
+                except Exception as e:
+                    logger.error("[RETROCOGNITION] Generation step %d failed: %s", i + 1, e)
+                    break
+            else:
+                # Stub generation for when no LLM is available
+                accumulated_code += f"\n# Step {i + 1}: {step_prompts[i]}\n"
+                accumulated_code += f"# TODO: Implement {target_request}\n"
+
+            cp = self._create_checkpoint(accumulated_code, f"Step {i + 1}: {step_prompts[i][:50]}")
+            checkpoints.append(cp)
+            logger.info("[RETROCOGNITION] Checkpoint %s created (%d lines).",
+                        cp.checkpoint_id, cp.lines_added)
+
+        duration = (time.time() - start) * 1000
+        logger.info("[RETROCOGNITION] Genesis complete: %d checkpoints in %.0fms.",
+                     len(checkpoints), duration)
+        return checkpoints
+
+    def get_latest(self) -> Optional[GenesisCheckpoint]:
+        """Return the most recent checkpoint."""
+        return self._checkpoints[-1] if self._checkpoints else None
+
+    @property
+    def timeline(self) -> List[Dict]:
+        return [{"id": cp.checkpoint_id, "desc": cp.description, "lines": cp.lines_added}
+                for cp in self._checkpoints]
 
 
-# Global Genesis Engine
+# Global singleton — always active
 retro_genesis = RetrocognitiveCodeGenesis()
