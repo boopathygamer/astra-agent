@@ -11,6 +11,11 @@
         "LLM_PROVIDER": "auto",
         "PYTHONIOENCODING": "utf-8"
       }
+    },
+    "astra-agent-http": {
+      "url": "http://127.0.0.1:8080/mcp",
+      "transport": "streamable-http",
+      "description": "Astra Agent MCP via HTTP (use when stdio is unavailable)"
     }
   }
 }

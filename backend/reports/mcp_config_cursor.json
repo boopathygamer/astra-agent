@@ -1,14 +1,15 @@
 {
     "mcpServers": {
-        "superchain-agent": {
+        "astra-agent": {
             "command": "python",
             "args": [
                 "-m",
-                "backend.mcp_server"
+                "mcp_server"
             ],
-            "cwd": "c:\\super-system",
+            "cwd": "c:\\astra agent\\backend",
             "env": {
-                "LLM_PROVIDER": "auto"
+                "LLM_PROVIDER": "auto",
+                "PYTHONIOENCODING": "utf-8"
             }
         }
     }

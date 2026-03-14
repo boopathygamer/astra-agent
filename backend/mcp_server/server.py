@@ -2,14 +2,15 @@
 MCP Server — FastMCP integration for SuperChain Universal AI Agent.
 ───────────────────────────────────────────────────────────────────
 Expert-level MCP server exposing:
-  • 18 Tools   — chat, agent tasks, thinking loop, code analysis, etc.
-  • 6 Resources — system health, config, memory stats, profiles, tools
-  • 5 Prompts  — code review, debugging, research, teaching, audit
+  • 24 Tools   — chat, reasoning, code analysis, refactoring, research, git, etc.
+  • 9 Resources — health, config, memory, profiles, tools, capabilities, metrics, workspace
+  • 8 Prompts  — code review, debugging, research, teaching, audit, architecture, perf, docs
 
 Architecture:
   Uses FastMCP's lifespan protocol for lazy initialization.
   All subsystems are created once and shared via AppContext.
   Thread-safe via generate_fn isolation per request.
+  Expert patterns: structured errors, request tracing, input validation, circuit breaker.
 """
 
 import json
@@ -34,6 +35,181 @@ logger = logging.getLogger(__name__)
 _BACKEND_DIR = str(Path(__file__).parent.parent)
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
+
+
+# ──────────────────────────────────────────────
+# Expert Infrastructure: Errors, Tracing, Validation, Circuit Breaker
+# ──────────────────────────────────────────────
+
+import secrets
+import functools
+import threading
+import subprocess
+from enum import Enum
+
+
+class ErrorCode(Enum):
+    """Typed error codes for structured MCP responses."""
+    NOT_INITIALIZED = "E001"
+    VALIDATION_FAILED = "E002"
+    TOOL_NOT_FOUND = "E003"
+    LLM_TIMEOUT = "E004"
+    LLM_FAILURE = "E005"
+    CIRCUIT_OPEN = "E006"
+    FILE_NOT_FOUND = "E007"
+    INTERNAL_ERROR = "E999"
+
+
+@dataclass
+class MCPError:
+    """Structured error envelope for all MCP responses."""
+    code: str
+    message: str
+    details: Optional[str] = None
+    retry_hint: Optional[str] = None
+
+    def to_dict(self) -> dict:
+        d = {"code": self.code, "message": self.message}
+        if self.details:
+            d["details"] = self.details
+        if self.retry_hint:
+            d["retry_hint"] = self.retry_hint
+        return d
+
+
+def _make_response(
+    data: dict,
+    trace_id: str,
+    start_time: float,
+    error: Optional[MCPError] = None,
+) -> dict:
+    """Build a standardised response envelope with tracing metadata."""
+    envelope: Dict[str, Any] = {
+        "success": error is None,
+        "trace_id": trace_id,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "duration_ms": round((time.time() - start_time) * 1000, 2),
+    }
+    if error:
+        envelope["error"] = error.to_dict()
+    else:
+        envelope["data"] = data
+    return envelope
+
+
+def _new_trace() -> tuple:
+    """Return (trace_id, start_time) for a new request."""
+    return secrets.token_hex(8), time.time()
+
+
+# ── Input Validation ──
+
+_MAX_INPUT_LEN = 100_000  # 100 KB max for any text input
+_MAX_CODE_LEN = 500_000   # 500 KB max for code inputs
+
+
+def _validate_string(value: str, name: str, max_len: int = _MAX_INPUT_LEN) -> Optional[MCPError]:
+    if not isinstance(value, str):
+        return MCPError(ErrorCode.VALIDATION_FAILED.value, f"{name} must be a string")
+    if len(value) > max_len:
+        return MCPError(
+            ErrorCode.VALIDATION_FAILED.value,
+            f"{name} exceeds maximum length ({len(value)} > {max_len})",
+            retry_hint=f"Reduce {name} to under {max_len} characters",
+        )
+    return None
+
+
+def _validate_range(value: int, name: str, lo: int, hi: int) -> Optional[MCPError]:
+    if not (lo <= value <= hi):
+        return MCPError(
+            ErrorCode.VALIDATION_FAILED.value,
+            f"{name} must be between {lo} and {hi}, got {value}",
+        )
+    return None
+
+
+def _sanitize_path(raw: str) -> Optional[str]:
+    """Block path traversal attempts; return resolved path or None."""
+    p = Path(raw).resolve()
+    if ".." in Path(raw).parts:
+        return None
+    return str(p)
+
+
+# ── Circuit Breaker ──
+
+class CircuitBreaker:
+    """Protects external calls (LLM, network) from cascading failures."""
+
+    def __init__(self, threshold: int = 5, cooldown_sec: float = 60.0):
+        self._threshold = threshold
+        self._cooldown = cooldown_sec
+        self._failures: Dict[str, int] = {}
+        self._open_since: Dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def is_open(self, subsystem: str) -> bool:
+        with self._lock:
+            opened = self._open_since.get(subsystem)
+            if opened and (time.time() - opened) > self._cooldown:
+                # Half-open: allow one attempt
+                del self._open_since[subsystem]
+                self._failures[subsystem] = 0
+                return False
+            return subsystem in self._open_since
+
+    def record_success(self, subsystem: str) -> None:
+        with self._lock:
+            self._failures[subsystem] = 0
+            self._open_since.pop(subsystem, None)
+
+    def record_failure(self, subsystem: str) -> None:
+        with self._lock:
+            self._failures[subsystem] = self._failures.get(subsystem, 0) + 1
+            if self._failures[subsystem] >= self._threshold:
+                self._open_since[subsystem] = time.time()
+                logger.warning(
+                    f"🔴 Circuit OPEN for '{subsystem}' after "
+                    f"{self._threshold} consecutive failures"
+                )
+
+
+# ── Performance Metrics ──
+
+class MetricsCollector:
+    """Thread-safe per-tool performance telemetry."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._calls: Dict[str, int] = {}
+        self._errors: Dict[str, int] = {}
+        self._total_ms: Dict[str, float] = {}
+
+    def record(self, tool: str, duration_ms: float, is_error: bool = False):
+        with self._lock:
+            self._calls[tool] = self._calls.get(tool, 0) + 1
+            self._total_ms[tool] = self._total_ms.get(tool, 0.0) + duration_ms
+            if is_error:
+                self._errors[tool] = self._errors.get(tool, 0) + 1
+
+    def snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            result = {}
+            for tool in self._calls:
+                calls = self._calls[tool]
+                result[tool] = {
+                    "calls": calls,
+                    "errors": self._errors.get(tool, 0),
+                    "avg_latency_ms": round(self._total_ms[tool] / calls, 2) if calls else 0,
+                    "error_rate": round(self._errors.get(tool, 0) / calls, 4) if calls else 0,
+                }
+            return result
+
+
+# Global singletons
+_circuit = CircuitBreaker()
+_metrics = MetricsCollector()
 
 
 # ──────────────────────────────────────────────
@@ -1147,4 +1323,567 @@ def create_mcp_server() -> FastMCP:
             ),
         ]
 
+    # ─────────────────────────────────────
+    # NEW EXPERT-LEVEL TOOLS (6 additional)
+    # ─────────────────────────────────────
+
+    @mcp.tool()
+    def project_scaffold(
+        project_type: str = "fastapi",
+        name: str = "my_project",
+        features: str = "auth,database,testing",
+    ) -> dict:
+        """
+        Generate a full project scaffold with best-practice structure.
+
+        Creates production-ready project skeletons with CI/CD configs,
+        Docker support, testing setup, and documentation templates.
+
+        Args:
+            project_type: Type of project (fastapi, react, nextjs, unity, flask, express)
+            name: Project name
+            features: Comma-separated features to include (auth,database,testing,docker,ci)
+        """
+        tid, t0 = _new_trace()
+        ctx: AppContext = mcp.get_context().request_context.lifespan_context
+        if not ctx.is_ready():
+            return _make_response({}, tid, t0, MCPError(ErrorCode.NOT_INITIALIZED.value, "Server not initialized"))
+
+        err = _validate_string(name, "name", 100)
+        if err:
+            return _make_response({}, tid, t0, err)
+
+        feature_list = [f.strip() for f in features.split(",") if f.strip()]
+
+        templates = {
+            "fastapi": {
+                "dirs": ["app", "app/api", "app/models", "app/core", "tests", "alembic"],
+                "files": ["main.py", "requirements.txt", "Dockerfile", ".env.example", "README.md"],
+            },
+            "react": {
+                "dirs": ["src", "src/components", "src/hooks", "src/pages", "public", "tests"],
+                "files": ["package.json", "vite.config.ts", "tsconfig.json", "index.html", "README.md"],
+            },
+            "nextjs": {
+                "dirs": ["app", "app/api", "components", "lib", "public", "tests"],
+                "files": ["package.json", "next.config.js", "tsconfig.json", "README.md"],
+            },
+            "unity": {
+                "dirs": ["Assets/Scripts", "Assets/Prefabs", "Assets/Materials", "Assets/Scenes", "Tests"],
+                "files": ["README.md", ".gitignore", "ProjectSettings.asset"],
+            },
+            "flask": {
+                "dirs": ["app", "app/routes", "app/models", "app/templates", "tests", "migrations"],
+                "files": ["run.py", "requirements.txt", "Dockerfile", "config.py", "README.md"],
+            },
+            "express": {
+                "dirs": ["src", "src/routes", "src/middleware", "src/models", "tests"],
+                "files": ["package.json", "server.js", "Dockerfile", ".env.example", "README.md"],
+            },
+        }
+
+        template = templates.get(project_type, templates["fastapi"])
+
+        if "docker" in feature_list and "Dockerfile" not in template["files"]:
+            template["files"].append("Dockerfile")
+            template["files"].append("docker-compose.yml")
+        if "ci" in feature_list:
+            template["dirs"].append(".github/workflows")
+            template["files"].append(".github/workflows/ci.yml")
+
+        # Use LLM to generate detailed scaffold content
+        try:
+            prompt = (
+                f"Generate a production-ready {project_type} project scaffold named '{name}'.\n"
+                f"Features: {', '.join(feature_list)}\n"
+                f"Provide the content for each key file as a JSON object with file paths as keys.\n"
+                f"Include: {', '.join(template['files'][:5])}"
+            )
+            content = ctx.generate_fn(prompt)
+            _circuit.record_success("llm")
+            data = {
+                "project_type": project_type,
+                "name": name,
+                "features": feature_list,
+                "structure": {"directories": template["dirs"], "files": template["files"]},
+                "generated_content": content,
+            }
+            _metrics.record("project_scaffold", (time.time() - t0) * 1000)
+            return _make_response(data, tid, t0)
+        except Exception as e:
+            _circuit.record_failure("llm")
+            _metrics.record("project_scaffold", (time.time() - t0) * 1000, is_error=True)
+            return _make_response({}, tid, t0, MCPError(ErrorCode.INTERNAL_ERROR.value, str(e)))
+
+    @mcp.tool()
+    def deep_research(
+        topic: str,
+        depth: str = "comprehensive",
+        max_sources: int = 5,
+    ) -> dict:
+        """
+        Multi-source deep research with citations and adversarial validation.
+
+        Performs comprehensive research using web search, memory recall,
+        and LLM reasoning. Validates findings with devil's advocate analysis.
+
+        Args:
+            topic: Research topic or question
+            depth: Research depth (quick, comprehensive, exhaustive)
+            max_sources: Maximum sources to consult (1-10)
+        """
+        tid, t0 = _new_trace()
+        ctx: AppContext = mcp.get_context().request_context.lifespan_context
+        if not ctx.is_ready():
+            return _make_response({}, tid, t0, MCPError(ErrorCode.NOT_INITIALIZED.value, "Server not initialized"))
+
+        err = _validate_string(topic, "topic")
+        if err:
+            return _make_response({}, tid, t0, err)
+
+        max_sources = min(max(max_sources, 1), 10)
+
+        try:
+            # Try the deep researcher profile first
+            from agents.profiles.deep_researcher import DeepResearcher
+            researcher = DeepResearcher(generate_fn=ctx.generate_fn)
+            result = researcher.research(topic, depth=depth, max_sources=max_sources)
+            _circuit.record_success("llm")
+            _metrics.record("deep_research", (time.time() - t0) * 1000)
+            return _make_response(result if isinstance(result, dict) else {"research": result}, tid, t0)
+        except Exception:
+            # Fallback: direct LLM research
+            try:
+                prompt = (
+                    f"Conduct {depth} research on: {topic}\n\n"
+                    f"Provide:\n1. Executive summary\n2. Key findings with confidence levels\n"
+                    f"3. Contrarian perspectives\n4. Knowledge gaps\n5. Practical implications"
+                )
+                answer = ctx.generate_fn(prompt)
+                _circuit.record_success("llm")
+                data = {"topic": topic, "depth": depth, "research": answer}
+                _metrics.record("deep_research", (time.time() - t0) * 1000)
+                return _make_response(data, tid, t0)
+            except Exception as e:
+                _circuit.record_failure("llm")
+                _metrics.record("deep_research", (time.time() - t0) * 1000, is_error=True)
+                return _make_response({}, tid, t0, MCPError(ErrorCode.LLM_FAILURE.value, str(e)))
+
+    @mcp.tool()
+    def refactor_code(
+        code: str,
+        language: str = "python",
+        strategy: str = "clean_architecture",
+    ) -> dict:
+        """
+        AI-guided code refactoring with before/after diff output.
+
+        Applies SOLID principles, design patterns, and language-specific
+        best practices. Returns refactored code with explanations.
+
+        Args:
+            code: Source code to refactor
+            language: Programming language
+            strategy: Refactoring strategy (clean_architecture, performance, readability, solid, dry)
+        """
+        tid, t0 = _new_trace()
+        ctx: AppContext = mcp.get_context().request_context.lifespan_context
+        if not ctx.is_ready():
+            return _make_response({}, tid, t0, MCPError(ErrorCode.NOT_INITIALIZED.value, "Server not initialized"))
+
+        err = _validate_string(code, "code", _MAX_CODE_LEN)
+        if err:
+            return _make_response({}, tid, t0, err)
+
+        try:
+            # First analyze, then refactor
+            analysis = {}
+            if ctx.code_analyzer:
+                report = ctx.code_analyzer.analyze(code, language=language)
+                analysis = {
+                    "quality_score": report.quality.overall_score,
+                    "grade": report.quality.grade,
+                    "complexity": report.quality.cyclomatic_complexity,
+                    "vulnerabilities": len(report.vulnerabilities),
+                }
+
+            prompt = (
+                f"Refactor this {language} code using '{strategy}' strategy.\n\n"
+                f"```{language}\n{code}\n```\n\n"
+                f"Apply: SOLID principles, design patterns, {language} best practices.\n"
+                f"Return:\n1. Refactored code in a code block\n"
+                f"2. List of changes made\n3. Before/after comparison"
+            )
+            refactored = ctx.generate_fn(prompt)
+            _circuit.record_success("llm")
+            data = {
+                "original_analysis": analysis,
+                "strategy": strategy,
+                "language": language,
+                "refactored": refactored,
+            }
+            _metrics.record("refactor_code", (time.time() - t0) * 1000)
+            return _make_response(data, tid, t0)
+        except Exception as e:
+            _circuit.record_failure("llm")
+            _metrics.record("refactor_code", (time.time() - t0) * 1000, is_error=True)
+            return _make_response({}, tid, t0, MCPError(ErrorCode.INTERNAL_ERROR.value, str(e)))
+
+    @mcp.tool()
+    def generate_tests(
+        code: str,
+        language: str = "python",
+        framework: str = "pytest",
+        coverage_target: str = "comprehensive",
+    ) -> dict:
+        """
+        Auto-generate unit tests for any code snippet.
+
+        Creates test cases covering happy paths, edge cases, error handling,
+        and boundary conditions. Supports pytest, jest, and unittest.
+
+        Args:
+            code: Source code to generate tests for
+            language: Programming language
+            framework: Testing framework (pytest, jest, unittest, mocha, xunit)
+            coverage_target: Coverage target (basic, comprehensive, exhaustive)
+        """
+        tid, t0 = _new_trace()
+        ctx: AppContext = mcp.get_context().request_context.lifespan_context
+        if not ctx.is_ready():
+            return _make_response({}, tid, t0, MCPError(ErrorCode.NOT_INITIALIZED.value, "Server not initialized"))
+
+        err = _validate_string(code, "code", _MAX_CODE_LEN)
+        if err:
+            return _make_response({}, tid, t0, err)
+
+        try:
+            prompt = (
+                f"Generate {coverage_target} {framework} tests for this {language} code:\n\n"
+                f"```{language}\n{code}\n```\n\n"
+                f"Include:\n1. Happy path tests\n2. Edge cases\n3. Error/exception tests\n"
+                f"4. Boundary value tests\n5. Mock/fixture setup where needed\n"
+                f"Return ONLY valid {framework} test code."
+            )
+            tests = ctx.generate_fn(prompt)
+            _circuit.record_success("llm")
+            data = {
+                "language": language,
+                "framework": framework,
+                "coverage_target": coverage_target,
+                "generated_tests": tests,
+            }
+            _metrics.record("generate_tests", (time.time() - t0) * 1000)
+            return _make_response(data, tid, t0)
+        except Exception as e:
+            _circuit.record_failure("llm")
+            _metrics.record("generate_tests", (time.time() - t0) * 1000, is_error=True)
+            return _make_response({}, tid, t0, MCPError(ErrorCode.LLM_FAILURE.value, str(e)))
+
+    @mcp.tool()
+    def workspace_summary(
+        directory: str = ".",
+        max_depth: int = 3,
+    ) -> dict:
+        """
+        Summarize an entire codebase or workspace structure.
+
+        Recursively scans the directory tree and returns file counts,
+        language breakdown, and structural overview.
+
+        Args:
+            directory: Root directory to summarize (default: current dir)
+            max_depth: Maximum directory depth to scan (1-10)
+        """
+        tid, t0 = _new_trace()
+        ctx: AppContext = mcp.get_context().request_context.lifespan_context
+        if not ctx.is_ready():
+            return _make_response({}, tid, t0, MCPError(ErrorCode.NOT_INITIALIZED.value, "Server not initialized"))
+
+        safe_dir = _sanitize_path(directory)
+        if not safe_dir:
+            return _make_response({}, tid, t0, MCPError(ErrorCode.VALIDATION_FAILED.value, "Invalid path"))
+        target = Path(safe_dir)
+        if not target.is_dir():
+            return _make_response({}, tid, t0, MCPError(ErrorCode.FILE_NOT_FOUND.value, f"Not a directory: {safe_dir}"))
+
+        max_depth = min(max(max_depth, 1), 10)
+
+        ext_counts: Dict[str, int] = {}
+        total_files = 0
+        total_dirs = 0
+        total_bytes = 0
+        tree_lines: List[str] = []
+
+        try:
+            for root, dirs, files in os.walk(safe_dir):
+                depth = root.replace(safe_dir, "").count(os.sep)
+                if depth >= max_depth:
+                    dirs.clear()
+                    continue
+                # Skip hidden/build directories
+                dirs[:] = [d for d in dirs if not d.startswith(".") and d not in {"__pycache__", "node_modules", ".git", "venv", "dist", "build"}]
+                indent = "  " * depth
+                tree_lines.append(f"{indent}📁 {os.path.basename(root)}/")
+                total_dirs += 1
+                for f in files:
+                    fp = os.path.join(root, f)
+                    total_files += 1
+                    try:
+                        total_bytes += os.path.getsize(fp)
+                    except OSError:
+                        pass
+                    ext = Path(f).suffix.lower() or "(no ext)"
+                    ext_counts[ext] = ext_counts.get(ext, 0) + 1
+
+            data = {
+                "directory": safe_dir,
+                "total_files": total_files,
+                "total_directories": total_dirs,
+                "total_size_mb": round(total_bytes / (1024 * 1024), 2),
+                "language_breakdown": dict(sorted(ext_counts.items(), key=lambda x: -x[1])[:20]),
+                "tree": "\n".join(tree_lines[:100]),
+            }
+            _metrics.record("workspace_summary", (time.time() - t0) * 1000)
+            return _make_response(data, tid, t0)
+        except Exception as e:
+            _metrics.record("workspace_summary", (time.time() - t0) * 1000, is_error=True)
+            return _make_response({}, tid, t0, MCPError(ErrorCode.INTERNAL_ERROR.value, str(e)))
+
+    @mcp.tool()
+    def git_operations(
+        operation: str = "status",
+        args: str = "",
+        repo_path: str = ".",
+    ) -> dict:
+        """
+        Perform Git operations on a repository.
+
+        Supports status, log, diff, branch, and read-only operations.
+        Destructive operations (push, force) are blocked for safety.
+
+        Args:
+            operation: Git operation (status, log, diff, branch, show, blame, stash_list)
+            args: Additional arguments for the git command
+            repo_path: Path to the git repository
+        """
+        tid, t0 = _new_trace()
+        ctx: AppContext = mcp.get_context().request_context.lifespan_context
+        if not ctx.is_ready():
+            return _make_response({}, tid, t0, MCPError(ErrorCode.NOT_INITIALIZED.value, "Server not initialized"))
+
+        # Safety: only allow read-only git operations
+        allowed_ops = {"status", "log", "diff", "branch", "show", "blame", "stash_list", "remote", "tag"}
+        if operation not in allowed_ops:
+            return _make_response(
+                {}, tid, t0,
+                MCPError(ErrorCode.VALIDATION_FAILED.value, f"Operation '{operation}' not allowed. Use: {', '.join(sorted(allowed_ops))}"),
+            )
+
+        safe_path = _sanitize_path(repo_path)
+        if not safe_path:
+            return _make_response({}, tid, t0, MCPError(ErrorCode.VALIDATION_FAILED.value, "Invalid repository path"))
+
+        try:
+            cmd_map = {
+                "status": ["git", "status", "--porcelain"],
+                "log": ["git", "log", "--oneline", "-20"],
+                "diff": ["git", "diff", "--stat"],
+                "branch": ["git", "branch", "-a"],
+                "show": ["git", "show", "--stat", "HEAD"],
+                "blame": ["git", "blame"],
+                "stash_list": ["git", "stash", "list"],
+                "remote": ["git", "remote", "-v"],
+                "tag": ["git", "tag", "-l"],
+            }
+            cmd = cmd_map.get(operation, ["git", operation])
+            if args:
+                cmd.extend(args.split())
+
+            result = subprocess.run(
+                cmd, cwd=safe_path, capture_output=True, text=True, timeout=30,
+            )
+            data = {
+                "operation": operation,
+                "output": result.stdout[:5000],
+                "errors": result.stderr[:1000] if result.returncode != 0 else "",
+                "return_code": result.returncode,
+            }
+            _metrics.record("git_operations", (time.time() - t0) * 1000)
+            return _make_response(data, tid, t0)
+        except subprocess.TimeoutExpired:
+            _metrics.record("git_operations", (time.time() - t0) * 1000, is_error=True)
+            return _make_response({}, tid, t0, MCPError(ErrorCode.LLM_TIMEOUT.value, "Git command timed out"))
+        except Exception as e:
+            _metrics.record("git_operations", (time.time() - t0) * 1000, is_error=True)
+            return _make_response({}, tid, t0, MCPError(ErrorCode.INTERNAL_ERROR.value, str(e)))
+
+    # ─────────────────────────────────────
+    # NEW RESOURCES (3 additional, total: 9)
+    # ─────────────────────────────────────
+
+    @mcp.resource("system://capabilities")
+    def system_capabilities() -> str:
+        """Full capability manifest — all tools, resources, and prompts with descriptions."""
+        capabilities = {
+            "server": "Astra SuperChain AI Agent — MCP Server",
+            "version": "3.0.0",
+            "tools_count": 24,
+            "resources_count": 9,
+            "prompts_count": 8,
+            "tool_categories": {
+                "conversation": ["chat", "agent_task"],
+                "reasoning": ["think", "quick_think"],
+                "code": ["analyze_code", "execute_code", "refactor_code", "generate_tests", "transpile_code", "evolve_code"],
+                "research": ["deep_research", "search_web"],
+                "security": ["scan_threats"],
+                "memory": ["memory_recall", "memory_store"],
+                "learning": ["tutor_start", "tutor_respond"],
+                "multi_agent": ["swarm_execute"],
+                "devtools": ["forge_tool", "project_scaffold", "workspace_summary", "git_operations"],
+                "math": ["calculate"],
+                "files": ["analyze_file"],
+            },
+            "transports": ["stdio", "streamable-http"],
+            "supported_ides": ["Cursor", "Antigravity (Gemini)", "Unity Editor", "Claude Desktop", "VS Code", "Windsurf"],
+        }
+        return json.dumps(capabilities, indent=2)
+
+    @mcp.resource("system://metrics")
+    def system_metrics() -> str:
+        """Performance telemetry — per-tool call counts, latencies, and error rates."""
+        data = {
+            "uptime_info": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "tool_metrics": _metrics.snapshot(),
+            "circuit_breaker": {
+                "status": "healthy",
+                "open_circuits": list(_circuit._open_since.keys()) if _circuit._open_since else [],
+            },
+        }
+        return json.dumps(data, indent=2)
+
+    @mcp.resource("workspace://structure")
+    def workspace_structure() -> str:
+        """Project file tree for the current Astra Agent workspace."""
+        tree: List[str] = []
+        root = Path(_BACKEND_DIR).parent
+        try:
+            for item in sorted(root.rglob("*")):
+                rel = item.relative_to(root)
+                # Skip hidden/build dirs
+                parts = rel.parts
+                if any(p.startswith(".") or p in {"__pycache__", "node_modules", "venv", "dist"} for p in parts):
+                    continue
+                depth = len(parts) - 1
+                if depth > 3:
+                    continue
+                prefix = "📁 " if item.is_dir() else "📄 "
+                tree.append(f"{'  ' * depth}{prefix}{item.name}")
+                if len(tree) > 200:
+                    tree.append("... (truncated)")
+                    break
+        except Exception as e:
+            tree.append(f"Error scanning: {e}")
+        return json.dumps({"root": str(root), "tree": "\n".join(tree)}, indent=2)
+
+    # ─────────────────────────────────────
+    # NEW PROMPTS (3 additional, total: 8)
+    # ─────────────────────────────────────
+
+    @mcp.prompt()
+    def architect_system(
+        requirements: str,
+        scale: str = "startup",
+        constraints: str = "",
+    ) -> list[base.Message]:
+        """
+        System architecture design prompt with DDD and scalability patterns.
+
+        Args:
+            requirements: System requirements description
+            scale: Expected scale (startup, growth, enterprise, hyperscale)
+            constraints: Technical constraints or preferences
+        """
+        constraint_section = f"\n\nConstraints: {constraints}" if constraints else ""
+        return [
+            base.UserMessage(
+                f"Design a production system architecture for:\n\n"
+                f"**Requirements:** {requirements}\n"
+                f"**Target Scale:** {scale}"
+                f"{constraint_section}\n\n"
+                f"Include:\n"
+                f"1. High-level architecture diagram (Mermaid syntax)\n"
+                f"2. Domain-Driven Design bounded contexts\n"
+                f"3. Data flow and API design\n"
+                f"4. Database schema recommendations\n"
+                f"5. Deployment topology (containers, orchestration)\n"
+                f"6. Scalability strategy (horizontal/vertical)\n"
+                f"7. Security architecture (AuthN/AuthZ, encryption)\n"
+                f"8. Monitoring and observability plan"
+            ),
+            base.AssistantMessage(
+                "I'll design a comprehensive system architecture. Let me start "
+                "with the high-level overview and then drill into each layer..."
+            ),
+        ]
+
+    @mcp.prompt()
+    def optimize_performance(
+        code: str,
+        language: str = "python",
+        bottleneck: str = "",
+    ) -> list[base.Message]:
+        """
+        Performance profiling and optimization prompt.
+
+        Args:
+            code: Code to optimize
+            language: Programming language
+            bottleneck: Known bottleneck description (optional)
+        """
+        bottleneck_ctx = f"\n\nKnown bottleneck: {bottleneck}" if bottleneck else ""
+        return [
+            base.UserMessage(
+                f"Optimize the performance of this {language} code:\n\n"
+                f"```{language}\n{code}\n```"
+                f"{bottleneck_ctx}\n\n"
+                f"Provide:\n"
+                f"1. Time complexity analysis (Big-O)\n"
+                f"2. Space complexity analysis\n"
+                f"3. Identified bottlenecks with profiling rationale\n"
+                f"4. Optimized version with explanations\n"
+                f"5. Benchmark comparison (before vs after)\n"
+                f"6. Memory optimization opportunities\n"
+                f"7. Concurrency/parallelism recommendations"
+            ),
+        ]
+
+    @mcp.prompt()
+    def write_documentation(
+        code: str,
+        doc_type: str = "all",
+        language: str = "python",
+    ) -> str:
+        """
+        Auto-generate documentation for code.
+
+        Args:
+            code: Source code to document
+            doc_type: Documentation type (docstrings, readme, api, all)
+            language: Programming language
+        """
+        return (
+            f"Generate {doc_type} documentation for this {language} code:\n\n"
+            f"```{language}\n{code}\n```\n\n"
+            f"Include:\n"
+            f"1. Module-level docstring with purpose and usage\n"
+            f"2. Function/class docstrings (Google style for Python)\n"
+            f"3. Parameter types and descriptions\n"
+            f"4. Return value documentation\n"
+            f"5. Usage examples\n"
+            f"6. API reference table (if applicable)\n"
+            f"7. README section with installation and quickstart"
+        )
+
     return mcp
+

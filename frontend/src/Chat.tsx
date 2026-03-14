@@ -52,7 +52,8 @@ import { Link } from 'react-router-dom';
 import {
   sendChat, configureProviders, checkHealth, getProviderStatus, type ProviderKeys,
   scanFile, scanDirectory, scanUrl, getScanStats, getScanHistory,
-  quarantineFile, destroyThreat, getMcpConfig, getMcpStatus, type McpStatus
+  quarantineFile, destroyThreat, getMcpConfig, getMcpStatus, type McpStatus,
+  mcpClient, getMcpCapabilities, getMcpMetrics, getMcpHealth,
 } from './api';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -187,9 +188,11 @@ export default function Chat() {
   // ── MCP State ──
   const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
   const [mcpConfigs, setMcpConfigs] = useState<Record<string, any>>({});
-  const [mcpSelectedClient, setMcpSelectedClient] = useState<'claude' | 'cursor' | 'vscode'>('claude');
+  const [mcpSelectedClient, setMcpSelectedClient] = useState<'claude' | 'cursor' | 'vscode' | 'antigravity' | 'unity'>('claude');
   const [mcpCopied, setMcpCopied] = useState('');
   const [mcpLoading, setMcpLoading] = useState(false);
+  const [mcpConnStatus, setMcpConnStatus] = useState<string>('disconnected');
+  const [mcpConnError, setMcpConnError] = useState<string>('');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ text: string, isUser: boolean, routedTo?: string, routingDisplay?: string, routingEmoji?: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -200,7 +203,6 @@ export default function Chat() {
   const [activeModelName, setActiveModelName] = useState<string>('');
   const [providerList, setProviderList] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const plusMenuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ── Slash Command State ──
@@ -918,15 +920,26 @@ export default function Chat() {
                       setSettingsTab('mcp');
                       if (!mcpStatus) {
                         setMcpLoading(true);
+                        setMcpConnError('');
                         Promise.all([
                           getMcpStatus().catch(() => null),
                           getMcpConfig('claude').catch(() => null),
                           getMcpConfig('cursor').catch(() => null),
                           getMcpConfig('vscode').catch(() => null),
                         ]).then(([status, claude, cursor, vscode]) => {
-                          if (status) setMcpStatus(status);
-                          setMcpConfigs({ claude, cursor, vscode });
+                          if (status) {
+                            setMcpStatus(status);
+                            setMcpConnStatus(status.connection_status || (status.agent_initialized ? 'connected' : 'disconnected'));
+                          }
+                          setMcpConfigs({
+                            claude, cursor, vscode,
+                            antigravity: { mcpServers: [{ name: 'astra-agent', command: 'python', args: ['-m', 'mcp_server'], cwd: 'c:\\astra agent\\backend', env: { LLM_PROVIDER: 'auto' }, timeout: 30000 }] },
+                            unity: { server: { name: 'astra-agent', url: 'http://127.0.0.1:8080/mcp', transport: 'streamable-http', startup_command: { command: 'python', args: ['-m', 'mcp_server', '--transport', 'http', '--port', '8080'] } } },
+                          });
                           setMcpLoading(false);
+                        }).catch(() => {
+                          setMcpLoading(false);
+                          setMcpConnError('Could not fetch MCP status');
                         });
                       }
                     }}
@@ -1065,8 +1078,72 @@ export default function Chat() {
                         <h3 className="text-lg font-medium text-white mb-1 flex items-center gap-2">
                           <Link2 className="w-5 h-5 text-cyan-400" />
                           MCP Connection
+                          <span className={`ml-auto flex items-center gap-1.5 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                            mcpConnStatus === 'connected'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : mcpConnStatus === 'connecting'
+                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                              : 'bg-white/5 text-white/30 border-white/10'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              mcpConnStatus === 'connected' ? 'bg-emerald-400 animate-pulse' :
+                              mcpConnStatus === 'connecting' ? 'bg-amber-400 animate-pulse' :
+                              'bg-white/20'
+                            }`} />
+                            {mcpConnStatus}
+                          </span>
                         </h3>
-                        <p className="text-sm text-white/50 mb-4">Connect Astra Agent to Claude Desktop, Cursor, VS Code, or any MCP-compatible client.</p>
+                        <p className="text-sm text-white/50 mb-4">Connect Astra Agent to Claude Desktop, Cursor, Antigravity, Unity, or any MCP-compatible client.</p>
+                      </div>
+
+                      {mcpConnError && (
+                        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm text-red-400">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                          {mcpConnError}
+                          <button onClick={() => setMcpConnError('')} className="ml-auto p-1 hover:bg-white/5 rounded">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Connect / Disconnect Button */}
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={async () => {
+                            setMcpConnStatus('connecting');
+                            setMcpConnError('');
+                            try {
+                              const ok = await mcpClient.connect();
+                              setMcpConnStatus(ok ? 'connected' : 'error');
+                              if (ok) {
+                                mcpClient.startHealthCheck();
+                                const tools = await mcpClient.listTools();
+                                setMcpStatus(prev => prev ? { ...prev, tools_count: tools.length, tools: tools.map(t => ({ name: t.name, description: t.description || '' })), connection_status: 'connected' } : prev);
+                              } else {
+                                setMcpConnError('Could not connect to MCP server. Make sure it is running.');
+                              }
+                            } catch (e: any) {
+                              setMcpConnStatus('error');
+                              setMcpConnError(e.message || 'Connection failed');
+                            }
+                          }}
+                          disabled={mcpConnStatus === 'connecting'}
+                          className="px-4 py-2 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/20 rounded-lg text-sm font-medium text-cyan-400 transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {mcpConnStatus === 'connecting' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          {mcpConnStatus === 'connected' ? 'Reconnect' : 'Connect to MCP'}
+                        </button>
+                        {mcpConnStatus === 'connected' && (
+                          <button
+                            onClick={() => { mcpClient.disconnect(); setMcpConnStatus('disconnected'); }}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white/50 transition-colors"
+                          >
+                            Disconnect
+                          </button>
+                        )}
+                        <span className="text-[10px] font-mono text-white/20 ml-auto">
+                          {mcpClient.url}
+                        </span>
                       </div>
 
                       {mcpLoading ? (
@@ -1095,14 +1172,16 @@ export default function Chat() {
                             </div>
                           </div>
 
-                          {/* Client Config Picker */}
+                          {/* Client Config Picker — now with 5 clients */}
                           <div className="space-y-3">
                             <label className="text-xs font-bold uppercase tracking-wider text-white/40">Client Configuration</label>
-                            <div className="flex gap-1">
+                            <div className="flex flex-wrap gap-1">
                               {[
-                                { key: 'claude' as const, label: 'Claude Desktop' },
+                                { key: 'claude' as const, label: 'Claude' },
                                 { key: 'cursor' as const, label: 'Cursor' },
                                 { key: 'vscode' as const, label: 'VS Code' },
+                                { key: 'antigravity' as const, label: 'Antigravity' },
+                                { key: 'unity' as const, label: 'Unity' },
                               ].map(({ key, label }) => (
                                 <button
                                   key={key}
@@ -1134,6 +1213,8 @@ export default function Chat() {
                             <p className="text-[10px] text-white/25 font-mono">
                               {mcpSelectedClient === 'claude' ? 'Paste into: claude_desktop_config.json' :
                                 mcpSelectedClient === 'cursor' ? 'Paste into: .cursor/mcp.json' :
+                                mcpSelectedClient === 'antigravity' ? 'Paste into: .gemini/settings.json' :
+                                mcpSelectedClient === 'unity' ? 'Save as: unity_mcp_config.json — start server with HTTP transport' :
                                   'Paste into: .vscode/settings.json'}
                             </p>
                           </div>
@@ -1165,11 +1246,29 @@ export default function Chat() {
                             ))}
                           </div>
 
-                          {/* Available Folders */}
-                          {mcpStatus?.tools && (
-                            <div className="mt-6 border-t border-white/10 pt-4">
+                          {/* Stats Banner */}
+                          {mcpStatus && (
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="bg-cyan-500/5 border border-cyan-500/10 rounded-xl p-3 text-center">
+                                <div className="text-xl font-black text-cyan-400">{mcpStatus.tools_count || 0}</div>
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-cyan-400/40">Tools</div>
+                              </div>
+                              <div className="bg-violet-500/5 border border-violet-500/10 rounded-xl p-3 text-center">
+                                <div className="text-xl font-black text-violet-400">{mcpStatus.resources_count || 0}</div>
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-violet-400/40">Resources</div>
+                              </div>
+                              <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3 text-center">
+                                <div className="text-xl font-black text-amber-400">{mcpStatus.prompts_count || 0}</div>
+                                <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400/40">Prompts</div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Available Tools */}
+                          {mcpStatus?.tools && mcpStatus.tools.length > 0 && (
+                            <div className="border-t border-white/10 pt-4">
                               <h4 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
-                                Available Folders ({mcpStatus.tools_count})
+                                Available Tools ({mcpStatus.tools_count})
                               </h4>
                               <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
                                 {mcpStatus.tools.map((tool) => (

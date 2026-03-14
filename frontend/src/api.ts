@@ -365,13 +365,20 @@ export async function getOrchestratorStatus(): Promise<OrchestratorStatus> {
 
 // ── MCP (Model Context Protocol) ────────────────
 
+import { mcpClient, type MCPToolResult, type MCPCapabilities, type MCPMetrics, type MCPConnectionState } from './mcpClient';
+
+// Re-export the singleton for direct use
+export { mcpClient };
+export type { MCPToolResult, MCPCapabilities, MCPMetrics, MCPConnectionState };
+
 export async function getMcpConfig(client: string = 'claude'): Promise<any> {
-    return apiFetch(`/mcp/config?client=${encodeURIComponent(client)}`);
+    return apiFetch(`/mcp/config?client=${encodeURIComponent(client)}`).catch(() => null);
 }
 
 export interface McpTool {
     name: string;
     description: string;
+    inputSchema?: Record<string, any>;
 }
 
 export interface McpStatus {
@@ -382,11 +389,76 @@ export interface McpStatus {
     http_url: string;
     tools_count: number;
     tools: McpTool[];
+    resources_count: number;
+    prompts_count: number;
     agent_initialized: boolean;
+    connection_status?: string;
 }
 
 export async function getMcpStatus(): Promise<McpStatus> {
-    return apiFetch<McpStatus>('/mcp/status');
+    // Try backend API first, then fallback to direct MCP connection
+    try {
+        return await apiFetch<McpStatus>('/mcp/status');
+    } catch {
+        // Fallback: build status from MCP client
+        const connected = await mcpClient.connect();
+        if (!connected) {
+            return {
+                project_root: '',
+                transports: ['stdio', 'streamable-http'],
+                stdio_command: 'python -m mcp_server',
+                http_command: 'python -m mcp_server --transport http --port 8080',
+                http_url: mcpClient.url,
+                tools_count: 0,
+                tools: [],
+                resources_count: 0,
+                prompts_count: 0,
+                agent_initialized: false,
+                connection_status: 'disconnected',
+            };
+        }
+
+        const tools = await mcpClient.listTools();
+        return {
+            project_root: '',
+            transports: ['stdio', 'streamable-http'],
+            stdio_command: 'python -m mcp_server',
+            http_command: 'python -m mcp_server --transport http --port 8080',
+            http_url: mcpClient.url,
+            tools_count: tools.length,
+            tools: tools.map(t => ({ name: t.name, description: t.description || '' })),
+            resources_count: mcpClient.state.resourcesCount,
+            prompts_count: mcpClient.state.promptsCount,
+            agent_initialized: true,
+            connection_status: 'connected',
+        };
+    }
+}
+
+/** Call any MCP tool directly via the HTTP transport */
+export async function callMcpTool(toolName: string, args: Record<string, any> = {}): Promise<MCPToolResult> {
+    if (!mcpClient.isConnected) {
+        await mcpClient.connect();
+    }
+    return mcpClient.callTool(toolName, args);
+}
+
+/** Get MCP server capabilities manifest */
+export async function getMcpCapabilities(): Promise<MCPCapabilities | null> {
+    if (!mcpClient.isConnected) await mcpClient.connect();
+    return mcpClient.getCapabilities();
+}
+
+/** Get MCP performance metrics */
+export async function getMcpMetrics(): Promise<MCPMetrics | null> {
+    if (!mcpClient.isConnected) await mcpClient.connect();
+    return mcpClient.getMetrics();
+}
+
+/** Get MCP system health */
+export async function getMcpHealth(): Promise<Record<string, any> | null> {
+    if (!mcpClient.isConnected) await mcpClient.connect();
+    return mcpClient.getHealth();
 }
 
 // ── Dev Studio: Model Validation ────────────────

@@ -1,0 +1,55 @@
+{
+  "_comment": "Unity Editor MCP Integration — Astra SuperChain AI Agent",
+  "_instructions": [
+    "1. Start the MCP server in HTTP mode: python -m mcp_server --transport http --port 8080",
+    "2. In Unity Editor, use UnityWebRequest or REST client to call the MCP endpoint",
+    "3. MCP endpoint: http://127.0.0.1:8080/mcp",
+    "4. All tool calls use POST with JSON body: {\"method\": \"tools/call\", \"params\": {\"name\": \"tool_name\", \"arguments\": {...}}}",
+    "5. Install 'Unity MCP Client' package or use the C# helper class below"
+  ],
+  "server": {
+    "name": "astra-agent",
+    "url": "http://127.0.0.1:8080/mcp",
+    "transport": "streamable-http",
+    "startup_command": {
+      "command": "python",
+      "args": ["-m", "mcp_server", "--transport", "http", "--port", "8080", "--host", "127.0.0.1"],
+      "cwd": "c:\\astra agent\\backend",
+      "env": {
+        "LLM_PROVIDER": "auto",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  },
+  "unity_tools": {
+    "game_dev": {
+      "tool": "project_scaffold",
+      "default_args": { "project_type": "unity", "name": "my_game", "features": "testing" },
+      "description": "Generate Unity project scaffold with best-practice structure"
+    },
+    "ai_chat": {
+      "tool": "chat",
+      "description": "Chat with Astra AI for game design, scripting, and debugging help"
+    },
+    "code_review": {
+      "tool": "analyze_code",
+      "default_args": { "language": "csharp" },
+      "description": "Analyze C# scripts for vulnerabilities and quality"
+    },
+    "generate_tests": {
+      "tool": "generate_tests",
+      "default_args": { "language": "csharp", "framework": "xunit" },
+      "description": "Auto-generate xUnit tests for Unity C# scripts"
+    },
+    "refactor": {
+      "tool": "refactor_code",
+      "default_args": { "language": "csharp", "strategy": "clean_architecture" },
+      "description": "Refactor C# code with SOLID principles"
+    },
+    "deep_think": {
+      "tool": "think",
+      "description": "Multi-iteration reasoning for complex game design problems"
+    }
+  },
+  "csharp_helper": "See backend/docs/unity_mcp_client.cs for the C# MCP client helper class"
+}
