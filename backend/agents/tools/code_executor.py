@@ -245,6 +245,7 @@ def evaluate_expression(expression: str) -> dict:
 
 from dataclasses import dataclass
 from typing import Optional
+import shutil
 
 @dataclass
 class CodeResult:
@@ -258,3 +259,220 @@ class CodeExecutor:
             return CodeResult(output=res.get("stdout"))
         else:
             return CodeResult(output=res.get("stdout"), error=res.get("stderr"))
+
+
+# ── JavaScript Blocklist ──
+_JS_DANGEROUS = [
+    "require('child_process')", "require('fs')", "require('net')",
+    "require('http')", "require('https')", "require('dgram')",
+    "process.exit", "process.kill", "process.env",
+    "eval(", "Function(", "child_process",
+]
+
+
+def _check_js_safety(code: str) -> str | None:
+    """Check JS/TS code for dangerous patterns."""
+    if len(code) > MAX_CODE_LENGTH:
+        return f"Code too long ({len(code)} chars)"
+    for pattern in _JS_DANGEROUS:
+        if pattern in code:
+            return f"Blocked dangerous pattern: {pattern}"
+    return None
+
+
+@registry.register(
+    name="execute_javascript",
+    description="Execute JavaScript code in a sandboxed Node.js subprocess.",
+    risk_level=RiskLevel.HIGH,
+    parameters={"code": "JavaScript code to execute", "timeout": "Timeout in seconds (default 30)"},
+)
+def execute_javascript(code: str, timeout: int = 30) -> dict:
+    """Execute JavaScript code safely in Node.js."""
+    safety_error = _check_js_safety(code)
+    if safety_error:
+        return {"stdout": "", "stderr": safety_error, "exit_code": -1, "success": False}
+
+    node_path = shutil.which("node")
+    if not node_path:
+        return {"stdout": "", "stderr": "Node.js not found. Install Node.js first.", "exit_code": -1, "success": False}
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".js", delete=False, encoding="utf-8") as f:
+        f.write(code)
+        temp_path = f.name
+
+    try:
+        result = subprocess.run(
+            [node_path, temp_path],
+            capture_output=True, text=True, timeout=timeout,
+            cwd=tempfile.gettempdir(),
+        )
+        return {
+            "stdout": result.stdout[:50_000],
+            "stderr": result.stderr[:10_000],
+            "exit_code": result.returncode,
+            "success": result.returncode == 0,
+            "language": "javascript",
+        }
+    except subprocess.TimeoutExpired:
+        return {"stdout": "", "stderr": f"Timed out after {timeout}s", "exit_code": -1, "success": False}
+    except Exception as e:
+        return {"stdout": "", "stderr": str(e), "exit_code": -1, "success": False}
+    finally:
+        try: Path(temp_path).unlink()
+        except OSError: pass
+
+
+@registry.register(
+    name="execute_typescript",
+    description="Execute TypeScript code via ts-node or tsx in a sandboxed subprocess.",
+    risk_level=RiskLevel.HIGH,
+    parameters={"code": "TypeScript code to execute", "timeout": "Timeout in seconds (default 30)"},
+)
+def execute_typescript(code: str, timeout: int = 30) -> dict:
+    """Execute TypeScript code safely."""
+    safety_error = _check_js_safety(code)
+    if safety_error:
+        return {"stdout": "", "stderr": safety_error, "exit_code": -1, "success": False}
+
+    ts_runner = shutil.which("tsx") or shutil.which("ts-node") or shutil.which("npx")
+    if not ts_runner:
+        return {"stdout": "", "stderr": "TypeScript runner not found (tsx/ts-node/npx)", "exit_code": -1, "success": False}
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ts", delete=False, encoding="utf-8") as f:
+        f.write(code)
+        temp_path = f.name
+
+    cmd = [ts_runner, temp_path] if "npx" not in ts_runner else [ts_runner, "tsx", temp_path]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=tempfile.gettempdir())
+        return {
+            "stdout": result.stdout[:50_000],
+            "stderr": result.stderr[:10_000],
+            "exit_code": result.returncode,
+            "success": result.returncode == 0,
+            "language": "typescript",
+        }
+    except subprocess.TimeoutExpired:
+        return {"stdout": "", "stderr": f"Timed out after {timeout}s", "exit_code": -1, "success": False}
+    except Exception as e:
+        return {"stdout": "", "stderr": str(e), "exit_code": -1, "success": False}
+    finally:
+        try: Path(temp_path).unlink()
+        except OSError: pass
+
+
+@registry.register(
+    name="execute_html",
+    description="Write HTML to a temp file and validate its structure. Returns the file path for preview.",
+    risk_level=RiskLevel.MEDIUM,
+    parameters={"html": "HTML content", "filename": "Output filename"},
+)
+def execute_html(html: str, filename: str = "preview.html") -> dict:
+    """Write and validate HTML content."""
+    if len(html) > MAX_CODE_LENGTH * 5:
+        return {"success": False, "error": "HTML too long"}
+
+    # Basic validation
+    warnings = []
+    if "<!DOCTYPE" not in html.upper():
+        warnings.append("Missing <!DOCTYPE html> declaration")
+    if "<html" not in html.lower():
+        warnings.append("Missing <html> tag")
+    if "<head" not in html.lower():
+        warnings.append("Missing <head> tag")
+    if "<title" not in html.lower():
+        warnings.append("Missing <title> tag (SEO)")
+    if 'meta name="viewport"' not in html.lower() and "viewport" not in html.lower():
+        warnings.append("Missing viewport meta tag (mobile)")
+    if "<script" in html.lower():
+        # Check for inline event handlers
+        import re
+        if re.search(r'on\w+\s*=', html, re.IGNORECASE):
+            warnings.append("Inline event handlers detected — use addEventListener instead")
+
+    out_dir = Path(tempfile.gettempdir()) / "astra_html_preview"
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / filename
+    out_path.write_text(html, encoding="utf-8")
+
+    return {
+        "success": True,
+        "file_path": str(out_path),
+        "file_size": len(html),
+        "warnings": warnings,
+        "valid": len(warnings) == 0,
+    }
+
+
+@registry.register(
+    name="lint_code",
+    description="Lint code for quality issues. Supports Python (pylint/flake8), JavaScript (eslint), and TypeScript.",
+    risk_level=RiskLevel.LOW,
+    parameters={"code": "Code to lint", "language": "python | javascript | typescript"},
+)
+def lint_code(code: str, language: str = "python") -> dict:
+    """Lint code for quality and style issues."""
+    if language == "python":
+        return _lint_python(code)
+    elif language in ("javascript", "typescript"):
+        return _lint_js(code, language)
+    return {"success": False, "error": f"Unsupported language: {language}"}
+
+
+def _lint_python(code: str) -> dict:
+    """Lint Python code using AST + basic checks."""
+    issues = []
+    lines = code.split("\n")
+
+    # Check syntax
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        return {"success": True, "issues": [{"line": e.lineno or 0, "severity": "error",
+                "message": f"SyntaxError: {e.msg}"}], "total": 1, "language": "python"}
+
+    # Style checks
+    for i, line in enumerate(lines, 1):
+        if len(line) > 120:
+            issues.append({"line": i, "severity": "warning", "message": f"Line too long ({len(line)} > 120)"})
+        if line.rstrip() != line:
+            issues.append({"line": i, "severity": "info", "message": "Trailing whitespace"})
+        if "\t" in line:
+            issues.append({"line": i, "severity": "warning", "message": "Tab indentation (use spaces)"})
+
+    # AST checks
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and not node.body:
+            issues.append({"line": node.lineno, "severity": "warning", "message": f"Empty function: {node.name}"})
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "*":
+                    issues.append({"line": node.lineno, "severity": "warning", "message": "Wildcard import"})
+
+    return {"success": True, "issues": issues[:100], "total": len(issues), "language": "python"}
+
+
+def _lint_js(code: str, language: str) -> dict:
+    """Lint JS/TS using basic pattern checks."""
+    import re
+    issues = []
+    lines = code.split("\n")
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if len(line) > 120:
+            issues.append({"line": i, "severity": "warning", "message": f"Line too long ({len(line)})"})
+        if re.search(r'\bvar\b', stripped):
+            issues.append({"line": i, "severity": "warning", "message": "Use 'let' or 'const' instead of 'var'"})
+        if "==" in stripped and "===" not in stripped and "!==" not in stripped:
+            issues.append({"line": i, "severity": "warning", "message": "Use === instead of =="})
+        if stripped.endswith("{"):
+            pass  # Normal
+        if "console.log" in stripped:
+            issues.append({"line": i, "severity": "info", "message": "console.log left in code"})
+        if "any" in stripped and language == "typescript":
+            if re.search(r':\s*any\b', stripped):
+                issues.append({"line": i, "severity": "warning", "message": "Avoid 'any' type in TypeScript"})
+
+    return {"success": True, "issues": issues[:100], "total": len(issues), "language": language}
