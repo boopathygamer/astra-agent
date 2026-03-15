@@ -269,6 +269,29 @@ class TokenBudgetConfig:
     auto_downgrade: bool = True
 
 
+@dataclass
+class HardwareConfig:
+    """Hardware observation and control configuration."""
+    # Environment Observer
+    observation_interval_s: float = 30.0       # Seconds between auto-observations
+    anomaly_z_threshold: float = 2.5           # Z-score for anomaly detection
+    snapshot_history_size: int = 100            # Rolling observation buffer
+    enable_auto_observation: bool = True        # Auto-observe on each request
+
+    # Thermal Governor
+    thermal_warning_c: float = 75.0            # Warning temperature threshold °C
+    thermal_critical_c: float = 85.0           # Critical temperature threshold °C
+
+    # Adaptive Scheduler
+    cpu_target_saturation: float = 90.0        # Target CPU utilization %
+
+    # Memory Pressure
+    memory_pressure_pct: float = 85.0          # RAM% to trigger memory pressure
+
+    # Audit Trail
+    audit_trail_dir: str = str(DATA_DIR / "hardware_audit")
+
+
 # ──────────────────────────────────────────────
 # Global Singleton Configs
 # ──────────────────────────────────────────────
@@ -280,5 +303,6 @@ brain_config = BrainConfig()
 threat_config = ThreatScanConfig()
 ssl_config = SSLConfig()
 token_budget_config = TokenBudgetConfig()
+hardware_config = HardwareConfig()
 
 
