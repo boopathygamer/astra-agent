@@ -96,6 +96,9 @@ export default defineConfig(({ mode }) => {
         '/orchestrate': 'http://localhost:8000',
         '/mcp': 'http://localhost:8000',
         '/docs': 'http://localhost:8000',
+        '/asi': 'http://localhost:8000',
+        '/dev': 'http://localhost:8000',
+        '/airllm': 'http://localhost:8000',
         '/ws': {
           target: 'http://localhost:8000',
           ws: true,

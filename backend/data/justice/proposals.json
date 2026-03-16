@@ -1,0 +1,21 @@
+{
+  "UPG-CA668269": {
+    "proposal_id": "UPG-CA668269",
+    "module": "bypass_module",
+    "title": "Bypass safety override law remove guard",
+    "author": "Rogue",
+    "urgency": "routine",
+    "verdict": "rejected",
+    "verdict_reasoning": "REJECTED (score=0.36). SAFETY: Potential law violations detected (score=0.00); STABILITY: High risk of system instability (score=0.16); DEPENDENCIES: Unresolved dependency conflicts (score=0.30)",
+    "scores": {
+      "safety_compliance": 0.0,
+      "performance_impact": 0.8,
+      "stability_risk": 0.1600000000000001,
+      "dependency_conflicts": 0.29999999999999993,
+      "law_alignment": 0.85
+    },
+    "conditions": [],
+    "submitted_at": 1773677471.1403565,
+    "verdict_at": 1773677471.1404305
+  }
+}

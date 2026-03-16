@@ -72,6 +72,39 @@ from agents.response_formatter import ResponseFormatter
 from agents.agent_forge import AgentForge
 from agents.tools.tool_forge import ToolForge
 
+# ── JARVIS Intelligence Modules ──
+from brain.jarvis_core import JarvisCore, AuthorityLevel
+from brain.situational_awareness import SituationalAwareness
+from brain.predictive_intent import PredictiveIntent
+from brain.mission_controller import MissionController
+from brain.hyper_reasoner import HyperReasoner
+from brain.realtime_guardian import RealtimeGuardian
+from brain.knowledge_nexus import KnowledgeNexus
+
+# ── Mega Upgrade Modules ──
+from core.message_bus import MessageBus, get_message_bus, MessagePriority
+from core.agent_protocol import AgentRegistry, AgentIdentity, AgentRole, AgentCapability, get_agent_registry
+from brain.adaptive_learner import AdaptiveLearner, FeedbackType, LearningDomain
+from brain.project_intelligence import ProjectIntelligence
+from brain.workflow_engine import WorkflowEngine
+from brain.semantic_memory import SemanticMemory
+
+# ── Ultra Performance Modules ──
+from core.parallel_reasoning import ParallelReasoningEngine
+from core.cache_hierarchy import CacheHierarchy
+from core.query_decomposer import QueryDecomposer
+from core.predictive_prefetch import PredictivePrefetchEngine
+from core.context_optimizer import ContextOptimizer
+from core.performance_profiler import PerformanceProfiler
+from core.token_budget import TokenBudgetManager
+from core.streaming_pipeline import StreamingPipeline
+from core.resource_manager import ResourceManager
+from core.hot_path_optimizer import HotPathOptimizer
+from agents.collaboration import CollaborationFramework
+from agents.plugins import PluginManager
+from agents.scheduler import AgentScheduler, JobFrequency
+from core.local_model_provider import LocalModelProvider, GenerationMode
+
 logger = logging.getLogger(__name__)
 
 
@@ -232,13 +265,135 @@ class AgentController:
         self.advanced_reasoner = AdvancedReasoner()
         self.response_formatter = ResponseFormatter()
 
+        # ── JARVIS Intelligence Layer ──
+        try:
+            self.jarvis_core = JarvisCore(
+                generate_fn=generate_fn,
+                authority_level=AuthorityLevel.SUGGEST,
+            )
+            self.situational_awareness = SituationalAwareness()
+            self.predictive_intent = PredictiveIntent()
+            self.mission_controller = MissionController(generate_fn=generate_fn)
+            self.hyper_reasoner = HyperReasoner(generate_fn=generate_fn)
+            self.realtime_guardian = RealtimeGuardian()
+            self.knowledge_nexus = KnowledgeNexus()
+
+            # Register all subsystems with JARVIS core
+            for name, instance in [
+                ("situational_awareness", self.situational_awareness),
+                ("predictive_intent", self.predictive_intent),
+                ("mission_controller", self.mission_controller),
+                ("hyper_reasoner", self.hyper_reasoner),
+                ("realtime_guardian", self.realtime_guardian),
+                ("knowledge_nexus", self.knowledge_nexus),
+            ]:
+                self.jarvis_core.register_subsystem(name, instance)
+
+            self.jarvis_core.start_heartbeat()
+            logger.info("[JARVIS] All 7 intelligence modules initialized and registered")
+        except Exception as e:
+            logger.warning(f"[JARVIS] Module init failed (non-fatal): {e}")
+            self.jarvis_core = None
+            self.situational_awareness = None
+            self.predictive_intent = None
+            self.mission_controller = None
+            self.hyper_reasoner = None
+            self.realtime_guardian = None
+            self.knowledge_nexus = None
+
+        # ── Mega Upgrade Layer ──
+        try:
+            self.message_bus = get_message_bus()
+            self.agent_registry = get_agent_registry()
+            self.adaptive_learner = AdaptiveLearner()
+            self.project_intelligence = ProjectIntelligence()
+            self.workflow_engine = WorkflowEngine(generate_fn=generate_fn)
+            self.semantic_memory = SemanticMemory(generate_fn=generate_fn)
+            self.collaboration = CollaborationFramework(generate_fn=generate_fn)
+            self.plugin_manager = PluginManager()
+            self.scheduler = AgentScheduler()
+            self.local_model = LocalModelProvider(cloud_fn=generate_fn)
+
+            # Register self in agent registry
+            self_identity = AgentIdentity(
+                name="AstraController",
+                role=AgentRole.COORDINATOR,
+                capabilities=[
+                    AgentCapability(name="coordination", domains=["all"]),
+                ],
+            )
+            self.agent_registry.register(self_identity)
+
+            # Subscribe bus events for learning
+            self.message_bus.subscribe("agent.*", lambda msg: None, subscriber_id="controller")
+
+            # Start scheduler with standard jobs
+            self.scheduler.register(
+                "heartbeat", lambda: self.message_bus.publish("system.heartbeat", time.time(), sender="scheduler"),
+                frequency=JobFrequency.MINUTES, interval=1, priority=1,
+            )
+            self.scheduler.start()
+
+            logger.info("[MEGA] All upgrade modules initialized: bus, registry, learner, "
+                        "project-intel, workflows, semantic-mem, collab, plugins, scheduler, local-model")
+        except Exception as e:
+            logger.warning(f"[MEGA] Upgrade module init failed (non-fatal): {e}")
+            self.message_bus = None
+            self.agent_registry = None
+            self.adaptive_learner = None
+            self.project_intelligence = None
+            self.workflow_engine = None
+            self.semantic_memory = None
+            self.collaboration = None
+            self.plugin_manager = None
+            self.scheduler = None
+            self.local_model = None
+
+        # ── Ultra Performance Layer ──
+        try:
+            self.parallel_reasoning = ParallelReasoningEngine(generate_fn=generate_fn)
+            self.cache_hierarchy = CacheHierarchy()
+            self.query_decomposer = QueryDecomposer(generate_fn=generate_fn)
+            self.predictive_prefetch = PredictivePrefetchEngine(generate_fn=generate_fn)
+            self.context_optimizer = ContextOptimizer()
+            self.performance_profiler = PerformanceProfiler()
+            self.token_budget = TokenBudgetManager()
+            self.streaming_pipeline = StreamingPipeline()
+            self.resource_manager = ResourceManager()
+            self.hot_path_optimizer = HotPathOptimizer()
+
+            # Connect police to message bus for alerts
+            try:
+                from agents.justice.police import police_dispatcher
+                if self.message_bus:
+                    police_dispatcher.set_message_bus(self.message_bus)
+            except Exception:
+                pass
+
+            logger.info("[ULTRA] All 10 performance modules initialized: parallel-reasoning, "
+                        "cache, decomposer, prefetch, context-opt, profiler, token-budget, "
+                        "streaming, resource-mgr, hot-path")
+        except Exception as e:
+            logger.warning(f"[ULTRA] Performance module init failed (non-fatal): {e}")
+            self.parallel_reasoning = None
+            self.cache_hierarchy = None
+            self.query_decomposer = None
+            self.predictive_prefetch = None
+            self.context_optimizer = None
+            self.performance_profiler = None
+            self.token_budget = None
+            self.streaming_pipeline = None
+            self.resource_manager = None
+            self.hot_path_optimizer = None
+
         logger.info(
             f"Universal Agent Controller initialized — "
             f"agent_id='{agent_id}', profile='{profile.value}', "
             f"session='{self._main_session.session_id}', "
             f"skills={len(self.skills.list_skills())}, "
             f"domains=10, personas=5, reasoning_strategies=4, "
-            f"safety=ENABLED"
+            f"safety=ENABLED, jarvis={'ONLINE' if self.jarvis_core else 'OFFLINE'}, "
+            f"mega_upgrade={'ONLINE' if self.message_bus else 'OFFLINE'}"
         )
 
     def process(
@@ -266,6 +421,41 @@ class AgentController:
 
         response.session_id = active_session
         self.metrics.counter("agent.process.requests_total")
+
+        # ── MEGA PRE-PROCESSING: Bus event + Plugin preprocessing + Memory context ──
+        mega_context = ""
+        try:
+            # 1. Publish incoming request to message bus
+            if self.message_bus:
+                self.message_bus.publish(
+                    "agent.request.incoming", {
+                        "input": user_input[:200], "session": active_session,
+                        "timestamp": time.time(),
+                    }, sender="controller",
+                )
+
+            # 2. Run plugin preprocessors on input
+            if self.plugin_manager:
+                user_input = self.plugin_manager.run_preprocessors(user_input)
+
+            # 3. Retrieve semantic memory context for this query
+            if self.semantic_memory:
+                mem_ctx = self.semantic_memory.get_context(user_input, max_tokens=500)
+                if mem_ctx:
+                    mega_context += f"\n[SEMANTIC MEMORY CONTEXT]\n{mem_ctx}\n"
+
+            # 4. Inject adaptive learning corrections if relevant
+            if self.adaptive_learner:
+                correction_ctx = self.adaptive_learner.get_correction_context(user_input)
+                if correction_ctx:
+                    mega_context += f"\n[LEARNED CORRECTIONS]\n{correction_ctx}\n"
+                # Get best strategy for this domain
+                best_strategy = self.adaptive_learner.get_best_strategy()
+                if best_strategy != "default":
+                    mega_context += f"\n[PREFERRED STRATEGY: {best_strategy}]\n"
+
+        except Exception as e:
+            logger.debug(f"[MEGA] Pre-processing error (non-fatal): {e}")
 
         with self.tracer.span("process_request") as root_span:
             root_span.attributes["session_id"] = active_session
@@ -462,10 +652,23 @@ class AgentController:
                 w for w in self._get_loop_warnings()
             ]
 
+        # ── MEGA: Inject project intelligence context if applicable ──
+        project_context = ""
+        try:
+            if self.project_intelligence and task_spec and task_spec.action_type in ("code", "debug", "build"):
+                # Check if we have a workspace to profile
+                workspace = getattr(self, '_workspace_path', None)
+                if workspace:
+                    proj_ctx = self.project_intelligence.get_context_for_file(workspace, "")
+                    if proj_ctx:
+                        project_context = f"\n[PROJECT INTELLIGENCE]\n{proj_ctx}\n"
+        except Exception as e:
+            logger.debug(f"[MEGA] Project intelligence error (non-fatal): {e}")
+
         # Step 3: Build enhanced prompt with domain, persona, reasoning, tools, memory
         enhanced_prompt = self._build_enhanced_prompt(
             user_input, task_spec, tool_results,
-            domain_context=expert_context,
+            domain_context=expert_context + mega_context + project_context,
             persona_context=persona.get_style_prompt(),
             reasoning_prompt=reasoning.reasoning_prompt,
         )
@@ -556,6 +759,81 @@ class AgentController:
             summary = f"Conversation with {session.message_count} messages about: {user_input[:100]}"
             self.session_manager.compact_session(active_session, summary)
 
+        # ── JARVIS: Learn from interaction ──
+        try:
+            if self.predictive_intent:
+                self.predictive_intent.record_action(
+                    response.mode or "chat",
+                    context={"topic": task_spec.action_type if task_spec else "general"},
+                )
+            if self.knowledge_nexus:
+                self.knowledge_nexus.learn_from_conversation(
+                    user_input, response.answer,
+                    topic=task_spec.action_type if task_spec else "",
+                )
+            if self.jarvis_core:
+                self.jarvis_core.update_interaction(
+                    task_spec.action_type if task_spec else "general"
+                )
+        except Exception as e:
+            logger.debug(f"[JARVIS] Learning hook error (non-fatal): {e}")
+
+        # ── MEGA POST-PROCESSING: Store memory + Learn + Bus event ──
+        try:
+            # 1. Store interaction in semantic memory
+            if self.semantic_memory:
+                self.semantic_memory.store(
+                    text=f"Q: {user_input[:200]} | A: {response.answer[:300]}",
+                    source="conversation",
+                    category="conversation",
+                    importance=min(1.0, response.confidence),
+                    metadata={
+                        "domain": domain_match.primary_domain,
+                        "mode": response.mode,
+                        "session": active_session,
+                    },
+                )
+
+            # 2. Record implicit positive feedback for adaptive learning
+            if self.adaptive_learner:
+                from brain.adaptive_learner import FeedbackType, LearningDomain
+                domain_map = {
+                    "code": LearningDomain.CODE_GENERATION,
+                    "debug": LearningDomain.DEBUGGING,
+                    "explain": LearningDomain.EXPLANATION,
+                    "creative": LearningDomain.CREATIVE,
+                }
+                learn_domain = domain_map.get(
+                    task_spec.action_type if task_spec else "",
+                    LearningDomain.CONVERSATION,
+                )
+                self.adaptive_learner.record_feedback(
+                    feedback_type=FeedbackType.IMPLICIT_ACCEPT,
+                    domain=learn_domain,
+                    strategy=response.mode or "default",
+                    query=user_input[:200],
+                    response=response.answer[:200],
+                )
+
+            # 3. Publish completion event to message bus
+            if self.message_bus:
+                self.message_bus.publish(
+                    "agent.response.complete", {
+                        "domain": domain_match.primary_domain,
+                        "mode": response.mode,
+                        "confidence": response.confidence,
+                        "duration_ms": (time.time() - start_time) * 1000,
+                        "session": active_session,
+                    }, sender="controller",
+                )
+
+            # 4. Check if input matches a workflow trigger
+            if self.workflow_engine:
+                self.workflow_engine.check_event_triggers(user_input)
+
+        except Exception as e:
+            logger.debug(f"[MEGA] Post-processing error (non-fatal): {e}")
+
         response.duration_ms = (time.time() - start_time) * 1000
         
         # ── EXPERT TELEMETRY: Record metrics ──
@@ -572,6 +850,19 @@ class AgentController:
         """
         active_session = session_id or self._main_session.session_id
 
+        # ── MEGA: Pre-process chat message ──
+        try:
+            if self.message_bus:
+                self.message_bus.publish(
+                    "agent.chat.incoming",
+                    {"message": message[:200], "session": active_session},
+                    sender="controller",
+                )
+            if self.plugin_manager:
+                message = self.plugin_manager.run_preprocessors(message)
+        except Exception:
+            pass
+
         # Build context with workspace injection
         workspace_prompt = self.workspace.assemble_system_prompt(self.agent_id)
         skills_prompt = self.skills.get_injections()
@@ -583,6 +874,19 @@ class AgentController:
         system = "\n\n".join(system_parts)
         if memory_context:
             system += f"\n\n{memory_context}"
+
+        # ── MEGA: Inject semantic memory context ──
+        try:
+            if self.semantic_memory:
+                sem_ctx = self.semantic_memory.get_context(message, max_tokens=300)
+                if sem_ctx:
+                    system += f"\n\n[SEMANTIC MEMORY]\n{sem_ctx}"
+            if self.adaptive_learner:
+                correction = self.adaptive_learner.get_correction_context(message)
+                if correction:
+                    system += f"\n\n[LEARNED CORRECTIONS]\n{correction}"
+        except Exception:
+            pass
 
         messages = list(self.conversation[-10:])
         messages.append({"role": "user", "content": message})
@@ -601,6 +905,28 @@ class AgentController:
         self.conversation.append({"role": "assistant", "content": response})
         self.session_manager.add_message(active_session, "user", message)
         self.session_manager.add_message(active_session, "assistant", response)
+
+        # ── MEGA: Post-process chat ──
+        try:
+            if self.semantic_memory:
+                self.semantic_memory.store(
+                    text=f"Q: {message[:150]} | A: {response[:250]}",
+                    source="chat", category="conversation",
+                )
+            if self.adaptive_learner:
+                from brain.adaptive_learner import FeedbackType
+                self.adaptive_learner.record_feedback(
+                    FeedbackType.IMPLICIT_ACCEPT,
+                    query=message[:200], response=response[:200],
+                )
+            if self.message_bus:
+                self.message_bus.publish(
+                    "agent.chat.complete",
+                    {"session": active_session},
+                    sender="controller",
+                )
+        except Exception:
+            pass
 
         return response
 

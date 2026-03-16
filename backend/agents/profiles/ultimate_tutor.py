@@ -73,7 +73,8 @@ class TeachingTechnique(Enum):
     ANTI_PATTERN = "anti_pattern"
     VISUAL_FLOWCHART = "visual_flowchart"
     GAME_CHALLENGE = "game_challenge"
-    DEEP_SOCRATIC = "deep_socratic"       # NEW: merged from SocraticTutor
+    DEEP_SOCRATIC = "deep_socratic"
+    MISCONCEPTION_FIRST = "misconception_first"  # NEW: teach by busting myths first
 
 
 class StudentLevel(Enum):
@@ -135,6 +136,14 @@ class TutoringSession:
     # Deep Socratic (merged from SocraticTutor)
     deep_socratic_dossier_path: Optional[Path] = None
     deep_socratic_intel: str = ""
+    # NEW: Tool-powered teaching
+    tool_demos_used: List[Any] = field(default_factory=list)
+    # NEW: Truth verification
+    truth_scores: List[float] = field(default_factory=list)
+    misconceptions_addressed: List[Dict[str, str]] = field(default_factory=list)
+    # NEW: Progressive disclosure state
+    progressive_stages: List[Any] = field(default_factory=list)
+    progressive_stage_idx: int = 0
 
 
 # ══════════════════════════════════════════════════════════════
@@ -319,6 +328,26 @@ in hyper-advanced, cutting-edge facts, but DO NOT just recite the facts. Force t
 to deduce the principles you see in the intelligence.
 
 Your goal is to build genuine neural pathways in the student's brain, not to be a search engine.""",
+
+    TeachingTechnique.MISCONCEPTION_FIRST: """\
+🧠💥 MISCONCEPTION-FIRST MODE — BUST MYTHS, THEN BUILD TRUTH:
+You are teaching by FIRST showing what everyone gets wrong, THEN guiding to truth.
+This is the opposite of textbook teaching — instead of building up, you tear down myths first.
+
+Rules:
+1. ALWAYS start with: "Before we learn X, let me show you what most people get WRONG about it"
+2. Present the most common misconception as if it's true, then ask: "Does this sound right?"
+3. After the student responds, REVEAL why it's wrong with a concrete demonstration
+4. Show the TRUTH with evidence: real code output, calculations, or citations
+5. Connect the misconception to its ROOT CAUSE: "People believe this because..."
+6. State the correct principle as a memorable rule: "Always remember: [principle]"
+7. Ask: "Can you think of another misconception related to this topic?"
+8. Use 🧠 for truth, ❌ for myth, 💡 for the "aha moment"
+9. When tool demonstrations are available, USE THEM to prove the truth
+10. End each lesson with: "What did you believe before we started? Has that changed?"
+
+The goal: students remember CONTRASTS better than facts.
+By showing what's wrong FIRST, the truth sticks 3x better.""",
 }
 
 
@@ -363,6 +392,10 @@ class UltimateTutorEngine:
       - ExpertTutorEngine (8 techniques, uncertainty detection, adaptive teaching)
     """
 
+    # LLM retry configuration
+    _LLM_MAX_RETRIES: int = 3
+    _LLM_BASE_DELAY: float = 0.5  # seconds
+
     def __init__(self, generate_fn: Callable, agent_controller=None, memory_manager=None):
         self.generate_fn = generate_fn
         self.agent = agent_controller
@@ -372,6 +405,8 @@ class UltimateTutorEngine:
         self._mistake_engine = None
         self._flowchart_gen = None
         self._game_engine = None
+        self._tool_bridge = None
+        self._truth_verifier = None
 
         # Lazy-init researcher (used by both uncertainty detection AND Deep Socratic)
         if agent_controller:
@@ -403,7 +438,28 @@ class UltimateTutorEngine:
         except Exception:
             logger.warning("GamifiedTutorEngine not available")
 
-        logger.info("🎓 UltimateTutorEngine initialized (9 techniques, gamified, research-powered)")
+        # NEW: Init tool bridge for live demonstrations
+        try:
+            from brain.tutor_tool_bridge import TutorToolBridge
+            self._tool_bridge = TutorToolBridge(
+                agent_controller=agent_controller, generate_fn=generate_fn,
+            )
+        except ImportError:
+            logger.warning("TutorToolBridge not available")
+
+        # NEW: Init truth verifier for fact-checking
+        try:
+            from brain.truth_verifier import TruthVerifier
+            self._truth_verifier = TruthVerifier(
+                generate_fn=generate_fn, tool_bridge=self._tool_bridge,
+            )
+        except ImportError:
+            logger.warning("TruthVerifier not available")
+
+        logger.info(
+            "🎓 UltimateTutorEngine initialized (10 techniques, gamified, "
+            "research-powered, tool-augmented, truth-verified)"
+        )
 
     # ──────────────────────────────────────
     # Session Management
@@ -451,6 +507,31 @@ class UltimateTutorEngine:
             session.player_state = self._game_engine.create_player()
             session.game_engine = self._game_engine
 
+        # Step 7 (NEW): Preload misconceptions for truth-first teaching
+        if self._mistake_engine:
+            try:
+                misconceptions = self._mistake_engine.generate_preemptive_misconceptions(topic)
+                session.misconceptions_addressed = [
+                    {"wrong": m.wrong_belief, "truth": m.truth, "source": m.source}
+                    for m in misconceptions
+                ]
+                if misconceptions:
+                    logger.info(f"🧠 Preloaded {len(misconceptions)} misconceptions to bust")
+            except Exception as e:
+                logger.warning(f"Misconception preloading failed: {e}")
+
+        # Step 8 (NEW): Run auto tool demos if bridge available
+        if self._tool_bridge:
+            try:
+                demos = self._tool_bridge.run_teaching_demos(
+                    topic=topic, student_level="beginner",
+                )
+                session.tool_demos_used = demos
+                if demos:
+                    logger.info(f"🔬 Prepared {len(demos)} live tool demonstrations")
+            except Exception as e:
+                logger.warning(f"Auto-demo generation failed: {e}")
+
         self._sessions[session_id] = session
         logger.info(
             f"🎓 Session {session_id}: topic='{topic}', "
@@ -458,7 +539,9 @@ class UltimateTutorEngine:
             f"research={'YES' if session.research_triggered else 'NO'}, "
             f"steps={len(session.lesson_plan)}, "
             f"anti_patterns={len(session.anti_pattern_lessons)}, "
-            f"gamified={'YES' if session.player_state else 'NO'}"
+            f"gamified={'YES' if session.player_state else 'NO'}, "
+            f"misconceptions={len(session.misconceptions_addressed)}, "
+            f"tool_demos={len(session.tool_demos_used)}"
         )
         return session
 
@@ -534,7 +617,7 @@ class UltimateTutorEngine:
         # Check if follow-up needs more research
         follow_up_uncertainty = self._check_followup_knowledge(session, student_message)
         if follow_up_uncertainty > 0.4 and not session.research_triggered:
-            logger.info(f"🔬 Student question triggered deep research")
+            logger.info("🔬 Student question triggered deep research")
             session.research_intel = self._research_for_teaching(f"{session.topic}: {student_message}")
             session.research_triggered = True
 
@@ -589,7 +672,36 @@ class UltimateTutorEngine:
                 f"Do NOT recite facts directly — force the student to DEDUCE principles."
             )
 
+        # NEW: Misconception-First technique injection
+        if session.current_technique == TeachingTechnique.MISCONCEPTION_FIRST:
+            teaching_prompt += self._format_misconception_context(session)
+
+        # NEW: Tool demonstration injection (for any technique)
+        if self._tool_bridge and self._should_use_tool_demo(student_message, session):
+            teaching_prompt += self._format_tool_demo_context(session, student_message)
+
         response = self._call_llm(teaching_prompt, system_prompt, temperature=0.7)
+
+        # NEW: Truth verification (non-blocking, lightweight)
+        if self._truth_verifier:
+            try:
+                truth_report = self._truth_verifier.verify_response(
+                    response, topic=session.topic, deep_verify=False,
+                )
+                session.truth_scores.append(truth_report.overall_confidence)
+                if truth_report.misconceptions_found:
+                    for m in truth_report.misconceptions_found:
+                        if m not in session.misconceptions_addressed:
+                            session.misconceptions_addressed.append(m)
+                # If confidence is very low, annotate the response
+                if truth_report.overall_confidence < 0.4:
+                    response += (
+                        "\n\n⚠️ *Note: Some claims in this explanation may need "
+                        "further verification. Let me know if anything seems off.*"
+                    )
+            except Exception as e:
+                logger.warning(f"Truth verification failed: {e}")
+
         session.history.append({"role": "assistant", "content": response})
 
         # Auto-advance lesson if student shows understanding
@@ -853,15 +965,30 @@ class UltimateTutorEngine:
     # ──────────────────────────────────────
 
     def _call_llm(self, prompt: str, system_prompt: str = "", temperature: float = 0.7) -> str:
-        """Call the LLM generation function safely."""
-        try:
-            result = self.generate_fn(prompt=prompt, system_prompt=system_prompt, temperature=temperature)
-            if hasattr(result, 'answer'): return result.answer
-            if hasattr(result, 'error') and result.error: return f"[LLM Error: {result.error}]"
-            return str(result)
-        except Exception as e:
-            logger.error(f"LLM call failed: {e}")
-            return "[Unable to generate response — using cached knowledge]"
+        """Call the LLM with exponential backoff retry."""
+        last_error = None
+        for attempt in range(self._LLM_MAX_RETRIES):
+            try:
+                result = self.generate_fn(
+                    prompt=prompt, system_prompt=system_prompt,
+                    temperature=temperature,
+                )
+                if hasattr(result, 'answer'):
+                    return result.answer
+                if hasattr(result, 'error') and result.error:
+                    return f"[LLM Error: {result.error}]"
+                return str(result)
+            except Exception as e:
+                last_error = e
+                delay = self._LLM_BASE_DELAY * (2 ** attempt)
+                logger.warning(
+                    "LLM call failed (attempt %d/%d): %s — retrying in %.1fs",
+                    attempt + 1, self._LLM_MAX_RETRIES, e, delay,
+                )
+                time.sleep(delay)
+
+        logger.error("LLM call failed after %d retries: %s", self._LLM_MAX_RETRIES, last_error)
+        return "[Unable to generate response — using cached knowledge]"
 
     def _build_system_prompt(self, session: TutoringSession) -> str:
         """Build the full system prompt combining technique + level + research."""
@@ -906,6 +1033,9 @@ class UltimateTutorEngine:
     def _select_technique(self, topic: str) -> TeachingTechnique:
         """Select the best teaching technique for a topic."""
         topic_lower = topic.lower()
+        # Topics with many common myths → bust misconceptions first
+        if any(w in topic_lower for w in ["myth", "misconception", "wrong", "mistake", "debug", "security", "performance"]):
+            return TeachingTechnique.MISCONCEPTION_FIRST
         if any(w in topic_lower for w in ["math", "calculus", "algebra", "physics", "chemistry", "algorithm", "data structure", "proof", "theorem"]):
             return TeachingTechnique.SCAFFOLDING
         if any(w in topic_lower for w in ["quantum", "philosophy", "theory", "abstract", "consciousness", "relativity", "economics"]):
@@ -1043,6 +1173,11 @@ class UltimateTutorEngine:
             "anti_patterns_loaded": len(session.anti_pattern_lessons),
             "gamification_active": session.player_state is not None,
             "techniques_available": [t.value for t in TeachingTechnique],
+            # NEW fields
+            "misconceptions_preloaded": len(session.misconceptions_addressed),
+            "tool_demos_prepared": len(session.tool_demos_used),
+            "tools_available": self._tool_bridge.available_tools if self._tool_bridge else [],
+            "truth_verification_active": self._truth_verifier is not None,
         }
 
     def api_respond(self, session_id: str, message: str) -> Dict[str, Any]:
@@ -1061,6 +1196,15 @@ class UltimateTutorEngine:
             },
             "research_used": session.research_triggered,
             "anti_patterns_shown": session.anti_patterns_shown,
+            # NEW: Truth verification and tool usage
+            "truth_score": round(
+                session.truth_scores[-1], 3,
+            ) if session.truth_scores else None,
+            "avg_truth_score": round(
+                sum(session.truth_scores) / len(session.truth_scores), 3,
+            ) if session.truth_scores else None,
+            "misconceptions_addressed": session.misconceptions_addressed,
+            "tool_demos_used": len(session.tool_demos_used),
         }
         if session.player_state:
             result["gamification"] = {
@@ -1077,3 +1221,101 @@ class UltimateTutorEngine:
 
 # Allow existing code that imports ExpertTutorEngine to keep working
 ExpertTutorEngine = UltimateTutorEngine
+
+
+# ══════════════════════════════════════════════════════════════
+# New Helper Methods for enhanced teaching
+# ══════════════════════════════════════════════════════════════
+
+def _format_misconception_context(self, session) -> str:
+    """Format misconception data for injection into MISCONCEPTION_FIRST prompts."""
+    if not session.misconceptions_addressed:
+        return ""
+    parts = ["\n\n--- MISCONCEPTIONS TO BUST ---"]
+    for i, m in enumerate(session.misconceptions_addressed[:3]):
+        parts.append(
+            f"\n{i+1}. ❌ MYTH: {m.get('wrong', 'Unknown myth')}"
+            f"\n   ✅ TRUTH: {m.get('truth', 'Unknown truth')}"
+        )
+    parts.append(
+        "\n--- END MISCONCEPTIONS ---\n"
+        "IMPORTANT: Start by presenting one of these myths as if plausible, "
+        "then guide the student to discover why it's wrong. "
+        "Use tool demonstrations if available to PROVE the truth."
+    )
+    return "\n".join(parts)
+
+
+def _should_use_tool_demo(self, student_msg: str, session) -> bool:
+    """Decide if a tool demonstration would help with this student message."""
+    msg_lower = student_msg.lower()
+    demo_triggers = [
+        "show me", "prove", "demonstrate", "run", "execute",
+        "what happens", "try it", "example", "output",
+        "calculate", "how much", "how many", "result",
+    ]
+    return any(trigger in msg_lower for trigger in demo_triggers)
+
+
+def _format_tool_demo_context(self, session, student_msg: str) -> str:
+    """Run a relevant tool demo and format results for prompt injection."""
+    if not self._tool_bridge:
+        return ""
+    
+    parts = ["\n\n--- LIVE TOOL DEMONSTRATION ---"]
+    msg_lower = student_msg.lower()
+    
+    try:
+        # Decide which tool to use
+        if any(w in msg_lower for w in ["run", "code", "execute", "output", "program"]):
+            # Extract code if present, otherwise generate a demo
+            import re
+            code_match = re.search(r'```\w*\n(.+?)```', student_msg, re.DOTALL)
+            if code_match:
+                demo = self._tool_bridge.demonstrate_with_code(
+                    code=code_match.group(1),
+                    annotation="Running student's code:",
+                )
+            else:
+                demo = self._tool_bridge.demonstrate_with_code(
+                    code=f"# Demo for: {session.topic}\nprint('Demo output')",
+                    annotation=f"Quick demo related to {session.topic}",
+                )
+            parts.append(demo.to_teaching_block())
+            session.tool_demos_used.append(demo)
+            
+        elif any(w in msg_lower for w in ["calculate", "math", "how much", "how many"]):
+            # Extract expression
+            numbers = re.findall(r'[\d+\-*/().\s]+', student_msg)
+            expr = numbers[0].strip() if numbers else "2 + 2"
+            if len(expr) > 2:
+                demo = self._tool_bridge.calculate(
+                    expression=expr,
+                    annotation="Calculating for the student:",
+                )
+                parts.append(demo.to_teaching_block())
+                session.tool_demos_used.append(demo)
+                
+        elif any(w in msg_lower for w in ["search", "find", "look up", "latest"]):
+            demo = self._tool_bridge.live_search(
+                query=f"{session.topic} {student_msg[:50]}",
+                annotation="Searching for relevant information:",
+            )
+            parts.append(demo.to_teaching_block())
+            session.tool_demos_used.append(demo)
+    except Exception as e:
+        logger.warning(f"Tool demo in teaching failed: {e}")
+        parts.append(f"⚠️ Tool demonstration unavailable: {e}")
+    
+    parts.append("--- END TOOL DEMONSTRATION ---")
+    parts.append(
+        "\nIMPORTANT: Reference this live demonstration in your response. "
+        "Show the student the real output and explain what it means."
+    )
+    return "\n".join(parts)
+
+
+# Bind the new methods to UltimateTutorEngine
+UltimateTutorEngine._format_misconception_context = _format_misconception_context
+UltimateTutorEngine._should_use_tool_demo = _should_use_tool_demo
+UltimateTutorEngine._format_tool_demo_context = _format_tool_demo_context

@@ -50,7 +50,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
-  sendChat, configureProviders, checkHealth, getProviderStatus, type ProviderKeys,
+  sendChat, streamChat, configureProviders, checkHealth, getProviderStatus, type ProviderKeys,
   scanFile, scanDirectory, scanUrl, getScanStats, getScanHistory,
   quarantineFile, destroyThreat, getMcpConfig, getMcpStatus, type McpStatus,
   mcpClient, getMcpCapabilities, getMcpMetrics, getMcpHealth,
@@ -196,6 +196,7 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ text: string, isUser: boolean, routedTo?: string, routingDisplay?: string, routingEmoji?: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const [apiKeys, setApiKeys] = useState<ProviderKeys>({});
   const [configStatus, setConfigStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -349,7 +350,7 @@ export default function Chat() {
     }
   }, [slashMenuOpen, filteredSlashTools, slashSelectedIdx, handleSlashSelect]);
 
-  // ── Smart Detail-Aware Submit ──
+  // ── Smart Detail-Aware Submit (Streaming-First) ──
   const sendMessageWithThinking = useCallback(async (rawInput: string, forceThinking: boolean = false) => {
     const userMessage = selectedTool ? `/${selectedTool.id} ${rawInput}` : rawInput;
     setMessages(prev => [...prev, { text: rawInput, isUser: true }]);
@@ -360,6 +361,63 @@ export default function Chat() {
     // Detect if user asked for detail → activate full thinking loop
     const useThinking = forceThinking || isDetailRequest(rawInput);
 
+    // ── Try streaming first, fallback to blocking sendChat ──
+    if (!useThinking) {
+      try {
+        let streamedText = '';
+        // Add a placeholder AI message that will be updated live
+        setMessages(prev => [...prev, { text: '', isUser: false }]);
+        setIsStreaming(true);
+
+        await streamChat(
+          userMessage,
+          (chunk: string) => {
+            streamedText += chunk;
+            setMessages(prev => {
+              const updated = [...prev];
+              updated[updated.length - 1] = { ...updated[updated.length - 1], text: streamedText };
+              return updated;
+            });
+          },
+          () => {
+            // Done — record tokens
+            const promptTk = estimateTokens(userMessage);
+            const completionTk = estimateTokens(streamedText);
+            setTokenRecords(prev => [{
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              timestamp: new Date(),
+              promptTokens: promptTk,
+              completionTokens: completionTk,
+              totalTokens: promptTk + completionTk,
+              provider: activeModelName || 'stream',
+              model: activeModelName || 'default',
+              message: rawInput.slice(0, 60),
+            }, ...prev].slice(0, 500));
+            setBackendStatus('connected');
+            setIsLoading(false);
+            setIsStreaming(false);
+          },
+          (_err: string) => {
+            // Streaming failed — remove placeholder and fall through to blocking
+            setMessages(prev => prev.slice(0, -1));
+            setIsStreaming(false);
+            sendBlockingChat(userMessage, rawInput, useThinking);
+          },
+        );
+        return;
+      } catch {
+        // If streamChat itself threw, remove placeholder and fallback
+        setMessages(prev => prev.length > 0 && !prev[prev.length - 1].isUser && prev[prev.length - 1].text === '' ? prev.slice(0, -1) : prev);
+        setIsStreaming(false);
+      }
+    }
+
+    // Blocking fallback (also used when useThinking is true)
+    await sendBlockingChat(userMessage, rawInput, useThinking);
+  }, [selectedTool, activeModelName]);
+
+  // ── Blocking sendChat helper ──
+  const sendBlockingChat = useCallback(async (userMessage: string, rawInput: string, useThinking: boolean) => {
     try {
       const res = await sendChat(userMessage, useThinking);
       const promptTk = estimateTokens(userMessage);
@@ -391,7 +449,7 @@ export default function Chat() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedTool, activeModelName]);
+  }, [activeModelName]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -640,7 +698,7 @@ export default function Chat() {
                     </div>
                     <div className="pt-2 flex items-center gap-2 text-white/50">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
+                      <span className="text-sm">{isStreaming ? 'Streaming...' : 'Thinking...'}</span>
                     </div>
                   </div>
                 </div>

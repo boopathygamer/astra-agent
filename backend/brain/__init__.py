@@ -32,3 +32,18 @@ from .omniscient_weaver import KnowledgeFabric
 from .architecture_compiler import ArchitectureCompiler
 from .temporal_paradox_resolver import TemporalParadoxResolver
 from .neural_symbiote_bridge import NeuralSymbioteBridge
+
+# JARVIS-Level Intelligence Modules
+from .jarvis_core import JarvisCore
+from .situational_awareness import SituationalAwareness
+from .predictive_intent import PredictiveIntent
+from .mission_controller import MissionController
+from .hyper_reasoner import HyperReasoner
+from .realtime_guardian import RealtimeGuardian
+from .knowledge_nexus import KnowledgeNexus
+
+# Mega Upgrade Intelligence Modules
+from .adaptive_learner import AdaptiveLearner
+from .project_intelligence import ProjectIntelligence
+from .workflow_engine import WorkflowEngine
+from .semantic_memory import SemanticMemory

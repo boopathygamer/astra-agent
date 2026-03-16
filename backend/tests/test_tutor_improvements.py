@@ -576,6 +576,247 @@ if __name__ == "__main__":
     test_expert_tutor_session_fields()
     test_expert_tutor_engine_init()
 
+    # Module 5: New Expert Modules (v2 upgrade)
+    print("\n── Expert Tutor v2 Modules ──")
+    test_tutor_tool_bridge()
+    test_truth_verifier()
+    test_misconception_preempt()
+    test_root_cause_chain()
+    test_tool_demo_result_formatting()
+    test_truth_report_api_dict()
+    test_misconception_first_technique()
+    test_enhanced_session_fields()
+    test_llm_retry_logic()
+
     print("\n" + "=" * 60)
     print("  ✅ ALL TUTOR IMPROVEMENT TESTS PASSED!")
     print("=" * 60 + "\n")
+
+
+# ══════════════════════════════════════════════════════════════
+# Module 5: Expert Tutor v2 Tests
+# ══════════════════════════════════════════════════════════════
+
+def test_tutor_tool_bridge():
+    """Test TutorToolBridge initialization and basic operations."""
+    from brain.tutor_tool_bridge import TutorToolBridge, ToolDemoResult, ToolCategory
+
+    bridge = TutorToolBridge(agent_controller=None, generate_fn=None)
+    assert isinstance(bridge.available_tools, list)
+    assert bridge.demo_count == 0
+
+    # Test calculate fallback (uses Python eval for basic math)
+    result = bridge.calculate("2 + 2")
+    assert result.success
+    assert "4" in result.formatted_output
+    assert result.tool == ToolCategory.CALCULATOR
+    assert result.execution_ms >= 0
+
+    # Test session summary
+    summary = bridge.get_session_summary()
+    assert summary["total_demos"] == 1
+    assert summary["successful"] == 1
+
+    print("✅ TutorToolBridge basic operations work")
+
+
+def test_truth_verifier():
+    """Test TruthVerifier hallucination detection and misconception checking."""
+    from brain.truth_verifier import TruthVerifier, TruthReport
+
+    verifier = TruthVerifier(generate_fn=None, tool_bridge=None)
+
+    # Test hallucination detection on suspicious text
+    report = verifier.verify_response(
+        "Python was invented in 1991. Exactly 95.7% of developers prefer it. "
+        "The best and only correct way to learn is through practice.",
+        topic="python",
+    )
+    assert isinstance(report, TruthReport)
+    assert len(report.hallucination_signals) > 0
+    assert "absolutist_claim" in report.hallucination_signals or "specific_statistic" in report.hallucination_signals
+
+    # Test trust badge
+    badge = report.trust_badge
+    assert any(emoji in badge for emoji in ["✅", "⚠️", "❓"])
+
+    # Test API dict output
+    api = report.to_api_dict()
+    assert "truth_score" in api
+    assert "hallucination_signals" in api
+    assert "verification_time_ms" in api
+
+    print("✅ TruthVerifier hallucination detection works")
+
+
+def test_misconception_preempt():
+    """Test MisconceptionPreempt dataclass and formatting."""
+    from brain.mistake_lesson_engine import MisconceptionPreempt
+
+    mp = MisconceptionPreempt(
+        topic="python",
+        wrong_belief="Python is interpreted, not compiled",
+        truth="Python IS compiled to bytecode first",
+        why_people_believe_it="Because there's no explicit compile step",
+        reveal_question="What do you think happens when you run 'python script.py'?",
+        prevalence="very_common",
+    )
+
+    block = mp.to_teaching_block()
+    assert "BEFORE WE START" in block
+    assert "Most people" in block  # very_common → Most people
+    assert mp.wrong_belief in block
+    assert mp.truth in block
+    assert mp.id.startswith("mp-")
+
+    print("✅ MisconceptionPreempt formatting works")
+
+
+def test_root_cause_chain():
+    """Test RootCauseChain dataclass and Mermaid generation."""
+    from brain.mistake_lesson_engine import RootCauseChain
+
+    chain = RootCauseChain(
+        topic="error_handling",
+        assumption="Exceptions don't need to be caught",
+        mistake="Using bare except clauses",
+        symptom="Silent failures, hard-to-debug issues",
+        root_cause="Catching too broadly hides the real error",
+        fix="Catch specific exception types",
+        principle="Always catch the narrowest exception possible",
+    )
+
+    block = chain.to_teaching_block()
+    assert "ROOT-CAUSE CHAIN" in block
+    assert "Assumption" in block
+    assert "Principle" in block
+    assert chain.id.startswith("rcc-")
+
+    # Test Mermaid diagram generation
+    mermaid = chain.to_mermaid()
+    assert "graph TD" in mermaid
+    assert "Assumption" in mermaid
+    assert "Principle" in mermaid
+    assert "style A" in mermaid  # Has styling
+
+    print("✅ RootCauseChain with Mermaid generation works")
+
+
+def test_tool_demo_result_formatting():
+    """Test ToolDemoResult to_teaching_block formatting."""
+    from brain.tutor_tool_bridge import ToolDemoResult, ToolCategory
+
+    # Success case
+    success = ToolDemoResult(
+        tool=ToolCategory.CODE_EXECUTOR,
+        success=True,
+        formatted_output="Hello, World!",
+        execution_ms=42.5,
+        teaching_annotation="Running a basic print statement",
+    )
+    block = success.to_teaching_block()
+    assert "LIVE DEMONSTRATION" in block
+    assert "Hello, World!" in block
+    assert "42ms" in block
+
+    # Error case (error as teaching moment)
+    error = ToolDemoResult(
+        tool=ToolCategory.CALCULATOR,
+        success=False,
+        error_message="Division by zero",
+    )
+    block = error.to_teaching_block()
+    assert "encountered an issue" in block
+    assert "teaching moment" in block
+
+    print("✅ ToolDemoResult formatting works correctly")
+
+
+def test_truth_report_api_dict():
+    """Test TruthReport to_api_dict for proper API serialization."""
+    from brain.truth_verifier import TruthReport
+
+    report = TruthReport(
+        original_response="Test response",
+        overall_confidence=0.85,
+        claims_checked=5,
+        claims_verified=4,
+        claims_flagged=1,
+        hallucination_signals=["specific_statistic"],
+        sources=[{"title": "Source 1", "url": "http://example.com"}],
+        verification_time_ms=123.456,
+    )
+
+    api = report.to_api_dict()
+    assert api["truth_score"] == 0.85
+    assert api["claims_checked"] == 5
+    assert api["claims_verified"] == 4
+    assert api["claims_flagged"] == 1
+    assert len(api["hallucination_signals"]) == 1
+    assert api["verification_time_ms"] == 123.5  # rounded
+    assert "High Confidence" in report.trust_badge
+
+    print("✅ TruthReport API serialization works")
+
+
+def test_misconception_first_technique():
+    """Test that MISCONCEPTION_FIRST technique exists and has a prompt."""
+    from agents.profiles.ultimate_tutor import TeachingTechnique, TECHNIQUE_PROMPTS
+
+    assert hasattr(TeachingTechnique, "MISCONCEPTION_FIRST")
+    assert TeachingTechnique.MISCONCEPTION_FIRST.value == "misconception_first"
+    assert TeachingTechnique.MISCONCEPTION_FIRST in TECHNIQUE_PROMPTS
+    prompt = TECHNIQUE_PROMPTS[TeachingTechnique.MISCONCEPTION_FIRST]
+    assert "MISCONCEPTION-FIRST" in prompt
+    assert "BUST MYTHS" in prompt
+    assert len(TeachingTechnique) == 10  # Verify we now have 10 techniques
+
+    print("✅ MISCONCEPTION_FIRST technique exists with 10 total techniques")
+
+
+def test_enhanced_session_fields():
+    """Test that TutoringSession has the new fields."""
+    from agents.profiles.ultimate_tutor import TutoringSession
+
+    session = TutoringSession(session_id="test", topic="python")
+    assert hasattr(session, "tool_demos_used")
+    assert hasattr(session, "truth_scores")
+    assert hasattr(session, "misconceptions_addressed")
+    assert hasattr(session, "progressive_stages")
+    assert hasattr(session, "progressive_stage_idx")
+    assert session.tool_demos_used == []
+    assert session.truth_scores == []
+    assert session.misconceptions_addressed == []
+
+    print("✅ TutoringSession has all new enhanced fields")
+
+
+def test_llm_retry_logic():
+    """Test that LLM retry with backoff is properly configured."""
+    from agents.profiles.ultimate_tutor import UltimateTutorEngine
+
+    assert hasattr(UltimateTutorEngine, "_LLM_MAX_RETRIES")
+    assert UltimateTutorEngine._LLM_MAX_RETRIES == 3
+    assert hasattr(UltimateTutorEngine, "_LLM_BASE_DELAY")
+    assert UltimateTutorEngine._LLM_BASE_DELAY == 0.5
+
+    # Test that retry works (mock with a function that fails then succeeds)
+    call_count = 0
+    def flaky_generate(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            raise ConnectionError("Simulated LLM failure")
+        class Result:
+            answer = "Success after retry"
+        return Result()
+
+    engine = UltimateTutorEngine(generate_fn=flaky_generate)
+    # Override delay for faster testing
+    engine._LLM_BASE_DELAY = 0.01
+    result = engine._call_llm("test prompt")
+    assert result == "Success after retry"
+    assert call_count == 3
+
+    print("✅ LLM retry with exponential backoff works")
+

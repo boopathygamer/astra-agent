@@ -520,3 +520,143 @@ export async function buildApk(
     });
 }
 
+
+// ── ASI Status ──────────────────────────────────
+
+export interface ASISubsystemStatus {
+    status: string;
+    description?: string;
+    error?: string;
+    [key: string]: any;
+}
+
+export interface ASIStatusResponse {
+    cortex: ASISubsystemStatus;
+    kernel_mutator: ASISubsystemStatus & {
+        mutation_threshold_ms?: number;
+        intelligence_factor?: number;
+        compiled_kernel?: string | null;
+        numba_available?: boolean;
+    };
+    containment_grid: ASISubsystemStatus & {
+        intelligence_factor?: number;
+        security_triad?: string[];
+    };
+    parasitic_sentinel: ASISubsystemStatus & {
+        compilations_intercepted?: number;
+        threats_blocked?: number;
+    };
+    ontological_sandbox: ASISubsystemStatus & {
+        executions?: number;
+        blocked?: number;
+        max_ast_nodes?: number;
+        timeout_seconds?: number;
+    };
+    polymorphic_parasite: ASISubsystemStatus & {
+        grid_nodes?: number;
+        total_free_vcpus?: number;
+        providers?: string[];
+    };
+    overall_threat_level: string;
+}
+
+export async function getASIStatus(): Promise<ASIStatusResponse> {
+    return apiFetch<ASIStatusResponse>('/asi/status');
+}
+
+
+// ── Streaming Chat (SSE) ────────────────────────
+
+export async function streamChat(
+    message: string,
+    onChunk: (text: string) => void,
+    onDone: () => void,
+    onError: (err: string) => void,
+): Promise<void> {
+    const controller = new AbortController();
+    try {
+        const res = await fetch(`${API_BASE}/chat/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message, use_thinking: false }),
+            signal: controller.signal,
+        });
+
+        if (!res.ok) {
+            onError(`Stream request failed (${res.status})`);
+            return;
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) {
+            onError('No readable stream available');
+            return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        if (data.type === 'text' || data.type === 'chunk') {
+                            onChunk(data.data || data.text || '');
+                        } else if (data.type === 'done') {
+                            onDone();
+                            return;
+                        } else if (data.type === 'error') {
+                            onError(data.data || 'Stream error');
+                            return;
+                        }
+                    } catch { /* skip malformed SSE lines */ }
+                }
+            }
+        }
+        onDone();
+    } catch (e: any) {
+        if (e.name !== 'AbortError') {
+            onError(e.message || 'Streaming failed');
+        }
+    }
+}
+
+
+// ── LLM Council Query ───────────────────────────
+
+export interface CouncilResult {
+    best_response: string;
+    best_provider: string;
+    best_model: string;
+    best_score: number;
+    council_size: number;
+    mode: string;
+    total_latency_ms: number;
+    all_ranked: Array<{
+        rank: number;
+        provider: string;
+        model: string;
+        score: number;
+        latency_ms: number;
+        text_preview: string;
+    }>;
+}
+
+export async function queryCouncil(
+    prompt: string,
+    systemPrompt: string = ''
+): Promise<CouncilResult> {
+    return apiFetch<CouncilResult>('/council/query', {
+        method: 'POST',
+        body: { prompt, system_prompt: systemPrompt },
+    });
+}
+

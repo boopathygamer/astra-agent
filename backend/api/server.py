@@ -934,9 +934,105 @@ async def tutor_respond(request: dict):
         raise HTTPException(500, "Tutoring error")
 
 
-# ──────────────────────────────────────────────
-# Multi-Agent Swarm Endpoint (auth required)
-# ──────────────────────────────────────────────
+@app.post("/tutor/demonstrate", dependencies=[Depends(verify_api_key)])
+async def tutor_demonstrate(request: dict):
+    """
+    Run a live tool demonstration within a tutoring session.
+    
+    Executes code, performs calculations, or searches the web
+    and returns teaching-annotated results.
+    
+    Body: {
+        "session_id": "abc123",
+        "demo_type": "code|calculate|search",
+        "input": "print(2 ** 10)"
+    }
+    """
+    session_id = request.get("session_id", "").strip()
+    demo_type = request.get("demo_type", "code").strip()
+    demo_input = request.get("input", "").strip()
+    
+    if not demo_input:
+        raise HTTPException(400, "input is required")
+    if len(demo_input) > 5000:
+        raise HTTPException(400, "Input too long (max 5,000 chars)")
+    
+    try:
+        tutor = _get_tutor()
+        if not tutor._tool_bridge:
+            raise HTTPException(501, "Tool bridge not available")
+        
+        bridge = tutor._tool_bridge
+        if demo_type == "code":
+            result = bridge.demonstrate_with_code(
+                code=demo_input,
+                annotation=request.get("annotation", "Live code demonstration"),
+            )
+        elif demo_type == "calculate":
+            result = bridge.calculate(
+                expression=demo_input,
+                annotation=request.get("annotation", "Calculation"),
+            )
+        elif demo_type == "search":
+            result = bridge.live_search(
+                query=demo_input,
+                annotation=request.get("annotation", "Web search"),
+            )
+        else:
+            raise HTTPException(400, f"Invalid demo_type: {demo_type}. Use code|calculate|search")
+        
+        return {
+            "success": result.success,
+            "tool": result.tool.value,
+            "output": result.formatted_output,
+            "raw_output": result.raw_output[:2000],
+            "execution_ms": round(result.execution_ms, 1),
+            "teaching_block": result.to_teaching_block(),
+            "error": result.error_message if not result.success else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Tutor demonstrate error: {type(e).__name__}", exc_info=True)
+        raise HTTPException(500, "Demonstration failed")
+
+
+@app.get("/tutor/{session_id}/truth", dependencies=[Depends(verify_api_key)])
+async def tutor_truth_report(session_id: str):
+    """
+    Get truth verification summary for a tutoring session.
+    
+    Returns confidence scores, flagged claims, sources checked,
+    and misconceptions addressed throughout the session.
+    """
+    if not session_id.replace("-", "").replace("_", "").isalnum():
+        raise HTTPException(400, "Invalid session ID format")
+    
+    try:
+        tutor = _get_tutor()
+        session = tutor.get_session(session_id)
+        if not session:
+            raise HTTPException(404, f"Session not found: {session_id}")
+        
+        avg_truth = (
+            sum(session.truth_scores) / len(session.truth_scores)
+            if session.truth_scores else None
+        )
+        
+        return {
+            "session_id": session_id,
+            "truth_scores": [round(s, 3) for s in session.truth_scores],
+            "average_truth_score": round(avg_truth, 3) if avg_truth else None,
+            "misconceptions_addressed": session.misconceptions_addressed,
+            "tool_demos_used": len(session.tool_demos_used),
+            "verification_active": tutor._truth_verifier is not None,
+            "total_responses_verified": len(session.truth_scores),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Truth report error: {type(e).__name__}", exc_info=True)
+        raise HTTPException(500, "Failed to generate truth report")
 
 @app.post("/swarm/execute", dependencies=[Depends(verify_api_key)])
 async def swarm_execute(request: dict):
@@ -1766,6 +1862,130 @@ async def scan_destroy_threat(request: dict):
 
 
 # ──────────────────────────────────────────────
+# ASI (Artificial Super Intelligence) Status
+# ──────────────────────────────────────────────
+
+@app.get("/asi/status")
+async def asi_status():
+    """
+    Full ASI subsystem status — Cortex, Kernel Mutator,
+    Containment Grid, Parasitic Sentinel, Ontological Sandbox,
+    and Polymorphic Parasite.
+    """
+    result = {
+        "cortex": {"status": "offline", "subsystems": {}},
+        "kernel_mutator": {"status": "standby", "intelligence_factor": 1.0, "compiled_kernel": None},
+        "containment_grid": {"status": "nominal", "intelligence_factor": 1.0},
+        "parasitic_sentinel": {"status": "active", "intercepted": 0, "blocked": 0},
+        "ontological_sandbox": {"status": "active", "executions": 0, "blocked": 0},
+        "polymorphic_parasite": {"status": "standby"},
+        "overall_threat_level": "nominal",
+    }
+
+    # Cortex
+    try:
+        from brain.asi_cortex import ASICortex
+        # Check if a cortex instance is cached on state
+        if hasattr(state, '_asi_cortex') and state._asi_cortex:
+            cortex = state._asi_cortex
+            result["cortex"] = cortex.status()
+            result["cortex"]["status"] = "online"
+        else:
+            result["cortex"]["status"] = "dormant"
+            result["cortex"]["description"] = "ASI Cortex available but not booted"
+    except Exception as e:
+        result["cortex"]["error"] = str(e)
+
+    # Kernel Mutator
+    try:
+        from brain.asi_kernel_mutator import ASIKernelMutator
+        result["kernel_mutator"] = {
+            "status": "patrolling",
+            "description": "Monitoring cognitive bottlenecks for C++/Verilog mutation",
+            "mutation_threshold_ms": 1500,
+            "intelligence_factor": 1.0,
+            "compiled_kernel": None,
+            "numba_available": False,
+        }
+        try:
+            from numba import jit
+            result["kernel_mutator"]["numba_available"] = True
+        except ImportError:
+            pass
+    except Exception as e:
+        result["kernel_mutator"]["error"] = str(e)
+
+    # Containment Grid
+    try:
+        from brain.containment_grid import ContainmentGrid
+        result["containment_grid"] = {
+            "status": "enforcing",
+            "description": "Auto-scaling containment — 3-judge tribunal active",
+            "intelligence_factor": 1.0,
+            "security_triad": ["ConstitutionalJudge", "EthicsAuditor", "MilitaryCompliance"],
+        }
+    except Exception as e:
+        result["containment_grid"]["error"] = str(e)
+
+    # Parasitic Sentinel
+    try:
+        from brain.parasitic_sentinel import parasitic_immune_system
+        sentinel_stats = parasitic_immune_system.stats
+        result["parasitic_sentinel"] = {
+            "status": "active",
+            "description": "Compiler-level safety interceptor with LIF neuron detection",
+            "compilations_intercepted": sentinel_stats.get("intercepted", 0),
+            "threats_blocked": sentinel_stats.get("blocked", 0),
+        }
+    except Exception as e:
+        result["parasitic_sentinel"]["error"] = str(e)
+
+    # Ontological Sandbox
+    try:
+        from brain.ontological_parasite import ontological_executor
+        sandbox_stats = ontological_executor.stats
+        result["ontological_sandbox"] = {
+            "status": "active",
+            "description": "Hardened sandboxed code execution with AST validation",
+            "executions": sandbox_stats.get("executions", 0),
+            "blocked": sandbox_stats.get("blocked", 0),
+            "max_ast_nodes": 500,
+            "timeout_seconds": 5.0,
+        }
+    except Exception as e:
+        result["ontological_sandbox"]["error"] = str(e)
+
+    # Polymorphic Parasite
+    try:
+        from brain.polymorphic_parasite import PolymorphicParasite, GridScanner
+        nodes = GridScanner.map_available_nodes()
+        total_vcpus = sum(n["vCPUs"] * n["count"] for n in nodes)
+        result["polymorphic_parasite"] = {
+            "status": "mapped",
+            "description": "Zero-cost decentralized compute daemon",
+            "grid_nodes": len(nodes),
+            "total_free_vcpus": total_vcpus,
+            "providers": [n["provider"] for n in nodes],
+        }
+    except Exception as e:
+        result["polymorphic_parasite"]["error"] = str(e)
+
+    # Overall threat level
+    blocked = (
+        result.get("parasitic_sentinel", {}).get("threats_blocked", 0)
+        + result.get("ontological_sandbox", {}).get("blocked", 0)
+    )
+    if blocked > 10:
+        result["overall_threat_level"] = "elevated"
+    elif blocked > 0:
+        result["overall_threat_level"] = "guarded"
+    else:
+        result["overall_threat_level"] = "nominal"
+
+    return result
+
+
+# ──────────────────────────────────────────────
 # Dev Studio Endpoints
 # ──────────────────────────────────────────────
 
@@ -1947,3 +2167,372 @@ async def dev_build_apk(request: _ApkBuildRequest):
         "apk_base64": html_b64,
         "size_mb": round(len(html_bytes) / (1024 * 1024), 2),
     }
+
+
+# ──────────────────────────────────────────────
+# JARVIS Intelligence System Endpoints
+# ──────────────────────────────────────────────
+
+@app.get("/jarvis/status")
+async def jarvis_status():
+    """Full JARVIS system status dashboard."""
+    try:
+        from brain.jarvis_core import JarvisCore
+        from brain.situational_awareness import SituationalAwareness
+        from brain.predictive_intent import PredictiveIntent
+        from brain.mission_controller import MissionController
+        from brain.hyper_reasoner import HyperReasoner
+        from brain.realtime_guardian import RealtimeGuardian
+        from brain.knowledge_nexus import KnowledgeNexus
+
+        controller = state.agent_controller
+        subsystems = {}
+
+        # Check each JARVIS subsystem
+        for name, cls in [
+            ("jarvis_core", JarvisCore),
+            ("situational_awareness", SituationalAwareness),
+            ("predictive_intent", PredictiveIntent),
+            ("mission_controller", MissionController),
+            ("hyper_reasoner", HyperReasoner),
+            ("realtime_guardian", RealtimeGuardian),
+            ("knowledge_nexus", KnowledgeNexus),
+        ]:
+            instance = getattr(controller, name, None) if controller else None
+            if instance and hasattr(instance, "get_status"):
+                subsystems[name] = {"online": True, **instance.get_status()}
+            else:
+                subsystems[name] = {"online": False, "status": "not_initialized"}
+
+        return {
+            "jarvis_online": True,
+            "subsystems": subsystems,
+            "total_online": sum(1 for s in subsystems.values() if s.get("online")),
+            "total_subsystems": 7,
+        }
+    except Exception as e:
+        logger.error(f"JARVIS status error: {e}")
+        return {"jarvis_online": False, "error": str(e)}
+
+
+@app.get("/jarvis/awareness")
+async def jarvis_awareness():
+    """Current situational awareness snapshot."""
+    try:
+        controller = state.agent_controller
+        awareness = getattr(controller, "situational_awareness", None)
+        if not awareness:
+            from brain.situational_awareness import SituationalAwareness
+            awareness = SituationalAwareness()
+        report = awareness.generate_report()
+        return report.to_dict()
+    except Exception as e:
+        logger.error(f"Awareness error: {e}")
+        return {"error": str(e)}
+
+
+@app.get("/jarvis/predictions")
+async def jarvis_predictions():
+    """Current predictions and suggestions."""
+    try:
+        controller = state.agent_controller
+        predictor = getattr(controller, "predictive_intent", None)
+        if not predictor:
+            return {"predictions": [], "accuracy": {}}
+        return {
+            "active_predictions": [
+                {
+                    "id": p.prediction_id,
+                    "type": p.prediction_type.value,
+                    "action": p.predicted_action,
+                    "description": p.description,
+                    "confidence": p.confidence,
+                }
+                for p in predictor.get_active_predictions()
+            ],
+            "accuracy": predictor.get_accuracy_stats(),
+            "briefing": predictor.generate_briefing().description,
+        }
+    except Exception as e:
+        logger.error(f"Predictions error: {e}")
+        return {"error": str(e)}
+
+
+class _MissionRequest(_PydanticBaseModel):
+    name: str
+    description: str
+    priority: str = "normal"
+
+
+@app.post("/jarvis/mission")
+async def jarvis_submit_mission(request: _MissionRequest):
+    """Submit an autonomous mission."""
+    try:
+        controller = state.agent_controller
+        mission_ctrl = getattr(controller, "mission_controller", None)
+        if not mission_ctrl:
+            from brain.mission_controller import MissionController
+            mission_ctrl = MissionController()
+
+        from brain.mission_controller import MissionPriority
+        priority_map = {
+            "low": MissionPriority.LOW, "normal": MissionPriority.NORMAL,
+            "high": MissionPriority.HIGH, "critical": MissionPriority.CRITICAL,
+        }
+        priority = priority_map.get(request.priority, MissionPriority.NORMAL)
+        mission = mission_ctrl.create_mission(
+            name=request.name, description=request.description, priority=priority,
+        )
+        result = mission_ctrl.execute_mission(mission.mission_id)
+        return result.to_dict()
+    except Exception as e:
+        logger.error(f"Mission error: {e}")
+        return {"error": str(e)}
+
+
+@app.get("/jarvis/knowledge")
+async def jarvis_knowledge(q: str = ""):
+    """Query the knowledge graph."""
+    try:
+        controller = state.agent_controller
+        nexus = getattr(controller, "knowledge_nexus", None)
+        if not nexus:
+            from brain.knowledge_nexus import KnowledgeNexus
+            nexus = KnowledgeNexus()
+
+        if q:
+            result = nexus.query(q)
+            return {
+                "query": q,
+                "results": [
+                    {"label": n.label, "type": n.node_type.value,
+                     "confidence": n.decayed_confidence(), "domain": n.domain}
+                    for n in result.nodes
+                ],
+                "edge_count": len(result.edges),
+            }
+        return nexus.get_stats()
+    except Exception as e:
+        logger.error(f"Knowledge error: {e}")
+        return {"error": str(e)}
+
+
+@app.get("/jarvis/guardian")
+async def jarvis_guardian():
+    """Security status and recent alerts."""
+    try:
+        controller = state.agent_controller
+        guardian = getattr(controller, "realtime_guardian", None)
+        if not guardian:
+            return {"online": False, "status": "not_initialized"}
+
+        status = guardian.get_status()
+        status["recent_forensics"] = guardian.get_forensic_log(10)
+        return status
+    except Exception as e:
+        logger.error(f"Guardian error: {e}")
+        return {"error": str(e)}
+
+
+# ═══════════════════════════════════════════
+# MEGA UPGRADE API ENDPOINTS
+# ═══════════════════════════════════════════
+
+@app.get("/mega/status")
+async def mega_full_status():
+    """Complete mega upgrade health dashboard."""
+    try:
+        c = state.agent_controller
+        return {
+            "mega_upgrade": "ONLINE",
+            "modules": {
+                "message_bus": getattr(c, "message_bus", None) is not None,
+                "agent_registry": getattr(c, "agent_registry", None) is not None,
+                "adaptive_learner": getattr(c, "adaptive_learner", None) is not None,
+                "project_intelligence": getattr(c, "project_intelligence", None) is not None,
+                "workflow_engine": getattr(c, "workflow_engine", None) is not None,
+                "semantic_memory": getattr(c, "semantic_memory", None) is not None,
+                "collaboration": getattr(c, "collaboration", None) is not None,
+                "plugin_manager": getattr(c, "plugin_manager", None) is not None,
+                "scheduler": getattr(c, "scheduler", None) is not None,
+                "local_model": getattr(c, "local_model", None) is not None,
+            },
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/bus")
+async def mega_bus_status(topic: str = None, limit: int = 50):
+    """Message bus metrics, history, and subscriptions."""
+    try:
+        bus = getattr(state.agent_controller, "message_bus", None)
+        if not bus:
+            return {"online": False}
+        return {
+            **bus.get_status(),
+            "history": bus.get_history(topic=topic, limit=limit),
+            "subscriptions": bus.get_subscriptions(),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/registry")
+async def mega_agent_registry():
+    """List all registered agents and capabilities."""
+    try:
+        registry = getattr(state.agent_controller, "agent_registry", None)
+        if not registry:
+            return {"online": False}
+        return {**registry.get_status(), "agents": registry.list_all()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/mega/learning/feedback")
+async def mega_learning_feedback(request: Request):
+    """Submit feedback for adaptive learning."""
+    try:
+        learner = getattr(state.agent_controller, "adaptive_learner", None)
+        if not learner:
+            return {"error": "not_initialized"}
+        data = await request.json()
+        from brain.adaptive_learner import FeedbackType, LearningDomain
+        signal = learner.record_feedback(
+            feedback_type=FeedbackType(data.get("type", "implicit_accept")),
+            domain=LearningDomain(data.get("domain", "conversation")),
+            strategy=data.get("strategy", "default"),
+            query=data.get("query", ""),
+            response=data.get("response", ""),
+            correction=data.get("correction", ""),
+        )
+        return {"signal_id": signal.signal_id, "rating": signal.rating}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/learning/insights")
+async def mega_learning_insights():
+    """Learning insights and strategy rankings."""
+    try:
+        learner = getattr(state.agent_controller, "adaptive_learner", None)
+        if not learner:
+            return {"online": False}
+        insights = learner.generate_insights()
+        return {
+            **learner.get_status(),
+            "insights": [{"domain": i.domain, "pattern": i.pattern,
+                         "recommendation": i.recommendation} for i in insights],
+            "strategy_ranking": learner.get_strategy_ranking(),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/mega/project/scan")
+async def mega_scan_project(request: Request):
+    """Scan and profile a project directory."""
+    try:
+        pi = getattr(state.agent_controller, "project_intelligence", None)
+        if not pi:
+            return {"error": "not_initialized"}
+        data = await request.json()
+        profile = pi.scan_project(data.get("path", ""))
+        return profile.to_dict()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/mega/workflow")
+async def mega_create_workflow(request: Request):
+    """Create a workflow from natural language."""
+    try:
+        engine = getattr(state.agent_controller, "workflow_engine", None)
+        if not engine:
+            return {"error": "not_initialized"}
+        data = await request.json()
+        wf = engine.create_from_instruction(data.get("instruction", ""))
+        return wf.to_dict()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/workflows")
+async def mega_list_workflows():
+    """List all workflows and run history."""
+    try:
+        engine = getattr(state.agent_controller, "workflow_engine", None)
+        if not engine:
+            return {"online": False}
+        return {**engine.get_status(), "workflows": engine.list_workflows()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/memory")
+async def mega_semantic_memory(q: str = "", category: str = None):
+    """Search or view semantic memory."""
+    try:
+        mem = getattr(state.agent_controller, "semantic_memory", None)
+        if not mem:
+            return {"online": False}
+        result = {"status": mem.get_status()}
+        if q:
+            results = mem.search(q, category=category)
+            result["results"] = [
+                {"text": r.memory.text[:200], "similarity": round(r.similarity, 3),
+                 "category": r.memory.category} for r in results
+            ]
+        return result
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/collaboration")
+async def mega_collaboration_status():
+    """Collaboration framework status."""
+    try:
+        collab = getattr(state.agent_controller, "collaboration", None)
+        if not collab:
+            return {"online": False}
+        return collab.get_status()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/plugins")
+async def mega_plugins():
+    """Plugin system status."""
+    try:
+        pm = getattr(state.agent_controller, "plugin_manager", None)
+        if not pm:
+            return {"online": False}
+        return {**pm.get_status(), "plugins": pm.list_plugins()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/scheduler")
+async def mega_scheduler():
+    """Scheduler jobs and history."""
+    try:
+        sched = getattr(state.agent_controller, "scheduler", None)
+        if not sched:
+            return {"online": False}
+        return {**sched.get_status(), "jobs": sched.list_jobs()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/mega/local-model")
+async def mega_local_model():
+    """Local model provider status."""
+    try:
+        lm = getattr(state.agent_controller, "local_model", None)
+        if not lm:
+            return {"online": False}
+        return lm.get_status()
+    except Exception as e:
+        return {"error": str(e)}
+

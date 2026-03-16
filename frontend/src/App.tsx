@@ -468,6 +468,26 @@ export default function App() {
   const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
   const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.95]);
 
+  // ── Live Stats ──
+  const [liveTools, setLiveTools] = useState<number | null>(null);
+  const [liveMemory, setLiveMemory] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const [health, stats] = await Promise.allSettled([
+          fetch('/health').then(r => r.json()),
+          fetch('/agent/stats').then(r => r.json()),
+        ]);
+        if (health.status === 'fulfilled') {
+          setLiveTools(health.value?.tools_available ?? null);
+          setLiveMemory(health.value?.memory_entries ?? null);
+        }
+      } catch { /* backend offline — keep defaults */ }
+    };
+    fetchStats();
+  }, []);
+
   return (
     <div className="min-h-screen selection:bg-brand-primary selection:text-black crt cursor-none">
       <CustomCursor />
@@ -500,7 +520,7 @@ export default function App() {
             transition={{ delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-6"
           >
-            <CyberButton text="Get Start" onClick={() => navigate('/chat')} className="w-full sm:w-auto" />
+            <CyberButton text="Get Started" onClick={() => navigate('/chat')} className="w-full sm:w-auto" />
           </motion.div>
         </motion.div>
 
@@ -513,9 +533,9 @@ export default function App() {
       {/* Stats Section */}
       <section className="py-10 md:py-20 border-y border-white/5 bg-brand-surface/30">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-3 gap-6 md:gap-12">
-          <StatBlock label="Active Agents" value="More" />
+          <StatBlock label="Active Tools" value={liveTools !== null ? String(liveTools) : '—'} />
           <StatBlock label="Recursive Depth" value="∞" />
-          <StatBlock label="Uptime" value="99.99%" />
+          <StatBlock label="Memory Entries" value={liveMemory !== null ? String(liveMemory) : '—'} />
         </div>
       </section>
 

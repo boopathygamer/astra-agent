@@ -64,6 +64,95 @@ class MistakeCurriculum:
         return [l for l in self.lessons if l.category == category]
 
 
+@dataclass
+class MisconceptionPreempt:
+    """
+    A preemptive misconception alert shown BEFORE teaching a concept.
+
+    Instead of waiting for the student to make a mistake, this proactively
+    says: "90% of people think X, but actually Y. Let me show you why."
+    """
+    id: str = field(default_factory=lambda: f"mp-{uuid.uuid4().hex[:8]}")
+    topic: str = ""
+    wrong_belief: str = ""          # What most people wrongly think
+    truth: str = ""                 # What is actually correct
+    why_people_believe_it: str = "" # Why this misconception is so common
+    reveal_question: str = ""       # Socratic question to help student discover the truth
+    prevalence: str = "common"      # common, very_common, universal
+    source: str = "knowledge_base"  # knowledge_base, llm_generated, failure_history
+
+    def to_teaching_block(self) -> str:
+        """Format as a teaching-ready preemption block."""
+        prevalence_map = {
+            "common": "Many people",
+            "very_common": "Most people",
+            "universal": "Almost everyone",
+        }
+        people = prevalence_map.get(self.prevalence, "Many people")
+        return (
+            f"\n🧠 **BEFORE WE START — Common Trap:**\n"
+            f"{people} believe: \"{self.wrong_belief}\"\n"
+            f"But actually: \"{self.truth}\"\n"
+            f"{'💡 Why this trap exists: ' + self.why_people_believe_it if self.why_people_believe_it else ''}\n"
+            f"{'🦉 Think about it: ' + self.reveal_question if self.reveal_question else ''}\n"
+        )
+
+
+@dataclass
+class RootCauseChain:
+    """
+    A full chain showing how a wrong assumption leads to failure,
+    and how to trace back to the root cause and fix.
+
+    Chain: assumption → mistake → symptom → root_cause → fix → principle
+    """
+    id: str = field(default_factory=lambda: f"rcc-{uuid.uuid4().hex[:8]}")
+    topic: str = ""
+    assumption: str = ""     # The initial wrong assumption
+    mistake: str = ""        # The mistake that follows from the assumption
+    symptom: str = ""        # What the student observes (the visible error)
+    root_cause: str = ""     # The real underlying cause
+    fix: str = ""            # How to fix it
+    principle: str = ""      # The universal principle to remember
+    mermaid_diagram: str = "" # Visual chain diagram
+
+    def to_teaching_block(self) -> str:
+        """Format as a detailed teaching chain."""
+        return (
+            f"\n🔗 **ROOT-CAUSE CHAIN — Trace the Problem:**\n"
+            f"  1️⃣ **Assumption:** {self.assumption}\n"
+            f"  2️⃣ **Mistake:** {self.mistake}\n"
+            f"  3️⃣ **Symptom:** {self.symptom}\n"
+            f"  4️⃣ **Root Cause:** {self.root_cause}\n"
+            f"  5️⃣ **Fix:** {self.fix}\n"
+            f"  6️⃣ **Principle:** 🧠 {self.principle}\n"
+        )
+
+    def to_mermaid(self) -> str:
+        """Generate a Mermaid diagram of the chain."""
+        if self.mermaid_diagram:
+            return self.mermaid_diagram
+
+        def safe(text: str) -> str:
+            return text[:50].replace('"', "'").replace('\n', ' ')
+
+        return (
+            f"graph TD\n"
+            f'    A["💭 Assumption: {safe(self.assumption)}"] --> B["❌ Mistake: {safe(self.mistake)}"]\n'
+            f'    B --> C["⚠️ Symptom: {safe(self.symptom)}"]\n'
+            f'    C --> D["🔍 Root Cause: {safe(self.root_cause)}"]\n'
+            f'    D --> E["🔧 Fix: {safe(self.fix)}"]\n'
+            f'    E --> F["🧠 Principle: {safe(self.principle)}"]\n'
+            f"\n"
+            f"    style A fill:#ff9944,color:#fff\n"
+            f"    style B fill:#ff4444,color:#fff\n"
+            f"    style C fill:#ff6644,color:#fff\n"
+            f"    style D fill:#4488ff,color:#fff\n"
+            f"    style E fill:#44bb44,color:#fff\n"
+            f"    style F fill:#00aa00,color:#fff\n"
+        )
+
+
 # ──────────────────────────────────────────────
 # Lesson Templates
 # ──────────────────────────────────────────────
@@ -488,3 +577,225 @@ graph TD
         except Exception as e:
             logger.error(f"LLM call failed in MistakeLessonEngine: {e}")
             return ""
+
+    # ──────────────────────────────────────
+    # Misconception Preemption
+    # ──────────────────────────────────────
+
+    def generate_preemptive_misconceptions(
+        self, topic: str, max_items: int = 3,
+    ) -> List[MisconceptionPreempt]:
+        """
+        Generate preemptive misconception alerts for a topic.
+
+        These are shown BEFORE teaching to prevent the student from
+        falling into common traps that "everyone" falls into.
+        """
+        results: List[MisconceptionPreempt] = []
+
+        # Source 1: Mine from failure history
+        if self.memory:
+            try:
+                failures = self.memory.retrieve_similar_failures(topic, n_results=10)
+                # Group by root cause to find recurring misconceptions
+                root_causes: Dict[str, int] = {}
+                for f in failures:
+                    rc = getattr(f, 'root_cause', '') or ''
+                    if rc and len(rc) > 10:
+                        root_causes[rc] = root_causes.get(rc, 0) + 1
+
+                for rc, count in sorted(root_causes.items(), key=lambda x: -x[1])[:2]:
+                    results.append(MisconceptionPreempt(
+                        topic=topic,
+                        wrong_belief=rc,
+                        truth=getattr(failures[0], 'fix', '') or "Apply the correct pattern",
+                        prevalence="very_common" if count >= 3 else "common",
+                        source="failure_history",
+                    ))
+            except Exception as e:
+                logger.warning(f"Failed to mine misconceptions from failures: {e}")
+
+        # Source 2: Generate via LLM
+        if self.generate_fn and len(results) < max_items:
+            try:
+                prompt = (
+                    f"What are the top {max_items - len(results)} most common misconceptions "
+                    f"that beginners have about: {topic}?\n\n"
+                    f"For each, explain:\n"
+                    f"1. What people wrongly believe\n"
+                    f"2. What is actually true\n"
+                    f"3. Why people fall for this misconception\n"
+                    f"4. A Socratic question to help them discover the truth\n\n"
+                    f"Format as JSON array:\n"
+                    f'[{{"wrong_belief": "...", "truth": "...", '
+                    f'"why_common": "...", "reveal_question": "..."}}]\n'
+                    f"Output ONLY the JSON array."
+                )
+                result = self._call_llm(prompt)
+                import json
+                import re
+                match = re.search(r'\[.*\]', result, re.DOTALL)
+                if match:
+                    items = json.loads(match.group(0))
+                    for item in items[:max_items - len(results)]:
+                        results.append(MisconceptionPreempt(
+                            topic=topic,
+                            wrong_belief=item.get("wrong_belief", ""),
+                            truth=item.get("truth", ""),
+                            why_people_believe_it=item.get("why_common", ""),
+                            reveal_question=item.get("reveal_question", ""),
+                            prevalence="common",
+                            source="llm_generated",
+                        ))
+            except Exception as e:
+                logger.warning(f"LLM misconception generation failed: {e}")
+
+        logger.info(f"🧠 Generated {len(results)} preemptive misconceptions for '{topic}'")
+        return results
+
+    # ──────────────────────────────────────
+    # Root-Cause Chain Builder
+    # ──────────────────────────────────────
+
+    def build_root_cause_chain(
+        self, lesson: AntiPatternLesson,
+    ) -> RootCauseChain:
+        """
+        Build a full root-cause chain from an anti-pattern lesson.
+
+        Chain: assumption → mistake → symptom → root_cause → fix → principle
+
+        This shows students the FULL path from wrong thinking to correct
+        understanding, not just "bad → good".
+        """
+        chain = RootCauseChain(
+            topic=lesson.category,
+            mistake=lesson.bad_approach,
+            root_cause=lesson.why_it_fails,
+            fix=lesson.correct_approach,
+            principle=lesson.expert_principle or "Apply defensive programming.",
+        )
+
+        # Try to enrich via LLM
+        if self.generate_fn:
+            try:
+                prompt = (
+                    f"Given this anti-pattern:\n"
+                    f"  Bad approach: {lesson.bad_approach}\n"
+                    f"  Why it fails: {lesson.why_it_fails}\n"
+                    f"  Fix: {lesson.correct_approach}\n\n"
+                    f"Fill in the FULL root-cause chain:\n"
+                    f'{{"assumption": "what wrong assumption led to this", '
+                    f'"symptom": "what the user actually sees/experiences when this goes wrong"}}\n'
+                    f"Output ONLY the JSON object."
+                )
+                result = self._call_llm(prompt)
+                import json
+                import re
+                match = re.search(r'\{.*\}', result, re.DOTALL)
+                if match:
+                    data = json.loads(match.group(0))
+                    chain.assumption = data.get("assumption", "Incorrect assumption")
+                    chain.symptom = data.get("symptom", "Unexpected failure")
+            except Exception as e:
+                logger.warning(f"Root-cause chain enrichment failed: {e}")
+                chain.assumption = "Incorrect assumption about how this works"
+                chain.symptom = "Unexpected error or failure"
+        else:
+            chain.assumption = "Incorrect assumption about how this works"
+            chain.symptom = "Unexpected error or failure"
+
+        # Generate Mermaid diagram
+        chain.mermaid_diagram = chain.to_mermaid()
+        return chain
+
+    # ──────────────────────────────────────
+    # Progressive Disclosure Formatter
+    # ──────────────────────────────────────
+
+    def format_progressive_disclosure(
+        self, lesson: AntiPatternLesson,
+    ) -> List[Dict[str, str]]:
+        """
+        Format an anti-pattern lesson as a progressive disclosure sequence.
+
+        Instead of showing everything at once, reveal information in stages:
+          Stage 1: Show the wrong code/approach
+          Stage 2: Ask student to find the bug
+          Stage 3: Reveal the symptom
+          Stage 4: Guide to the root cause
+          Stage 5: Show the fix
+          Stage 6: State the principle
+
+        Returns a list of stage dicts for the tutor to present one at a time.
+        """
+        stages = [
+            {
+                "stage": "1_challenge",
+                "emoji": "🔍",
+                "title": "Spot the Problem",
+                "content": (
+                    f"Look at this code/approach carefully:\n"
+                    f"```\n{lesson.bad_approach}\n```\n"
+                    f"Can you spot what's wrong with it? Take a moment to think..."
+                ),
+                "wait_for_student": True,
+            },
+            {
+                "stage": "2_hint",
+                "emoji": "💡",
+                "title": "Here's a Hint",
+                "content": (
+                    f"Think about what happens when: {lesson.why_it_fails[:80]}...\n"
+                    f"What would the user experience?"
+                ),
+                "wait_for_student": True,
+            },
+            {
+                "stage": "3_reveal",
+                "emoji": "⚠️",
+                "title": "The Problem",
+                "content": (
+                    f"The issue is:\n{lesson.why_it_fails}\n\n"
+                    f"Danger level: {'🔴' * max(1, int(lesson.danger_score / 2))}"
+                ),
+                "wait_for_student": False,
+            },
+            {
+                "stage": "4_fix",
+                "emoji": "✅",
+                "title": "The Correct Approach",
+                "content": (
+                    f"Here's how to do it right:\n"
+                    f"```\n{lesson.correct_approach}\n```"
+                ),
+                "wait_for_student": False,
+            },
+            {
+                "stage": "5_principle",
+                "emoji": "🧠",
+                "title": "Remember This Principle",
+                "content": (
+                    f"**Universal Principle:**\n"
+                    f"{lesson.expert_principle or 'Always validate, always test, always handle errors.'}\n\n"
+                    f"🎯 Can you think of another scenario where this principle applies?"
+                ),
+                "wait_for_student": True,
+            },
+        ]
+
+        # Add recovery steps if available
+        if lesson.recovery_steps:
+            recovery_content = "If you've already made this mistake, here's how to fix it:\n"
+            for i, step in enumerate(lesson.recovery_steps, 1):
+                recovery_content += f"  {i}. {step}\n"
+            stages.append({
+                "stage": "6_recovery",
+                "emoji": "🔧",
+                "title": "Recovery Plan",
+                "content": recovery_content,
+                "wait_for_student": False,
+            })
+
+        return stages
+

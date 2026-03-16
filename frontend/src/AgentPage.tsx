@@ -10,8 +10,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   checkHealth, getProviderStatus, getAgentStats, getProcesses,
   getSessions, getMemoryStats, getLongTermMemory, getDeviceList,
-  getOrchestratorStatus,
-  type HealthStatus
+  getOrchestratorStatus, getASIStatus,
+  type HealthStatus, type ASIStatusResponse
 } from './api';
 
 // ── Types ──
@@ -126,7 +126,7 @@ export default function AgentPage() {
   const [isOrchModalOpen, setOrchModalOpen] = useState(false);
 
   // ── Live Streaming WebSocket State ──
-  const [commTab, setCommTab] = useState<'activity' | 'chats' | 'decisions' | 'rankings' | 'feed'>('activity');
+  const [commTab, setCommTab] = useState<'activity' | 'chats' | 'decisions' | 'rankings' | 'feed' | 'asi'>('activity');
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
   const [executionSteps, setExecutionSteps] = useState<ExecutionStep[]>([]);
   const [reactSteps, setReactSteps] = useState<ReActStep[]>([]);
@@ -137,6 +137,10 @@ export default function AgentPage() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // ── ASI Status State ──
+  const [asiStatus, setAsiStatus] = useState<ASIStatusResponse | null>(null);
+  const [asiLoading, setAsiLoading] = useState(false);
 
   useEffect(() => {
     const socket = new WebSocket('ws://localhost:8000/ws/chat');
@@ -402,6 +406,10 @@ export default function AgentPage() {
 
     setLastRefresh(new Date());
     setIsRefreshing(false);
+
+    // ASI Status (async, non-blocking)
+    setAsiLoading(true);
+    getASIStatus().then(s => { setAsiStatus(s); setAsiLoading(false); }).catch(() => setAsiLoading(false));
   }, [addLog]);
 
   useEffect(() => {
@@ -642,7 +650,8 @@ export default function AgentPage() {
                 { id: 'chats', icon: MessageSquare, label: 'Agent Threads' },
                 { id: 'decisions', icon: Scale, label: 'Decisions' },
                 { id: 'rankings', icon: Trophy, label: 'Rankings' },
-                { id: 'feed', icon: Activity, label: 'System Logs' }
+                { id: 'feed', icon: Activity, label: 'System Logs' },
+                { id: 'asi', icon: Shield, label: 'ASI Activity' }
               ].map(tab => {
                 const Icon = tab.icon;
                 const isActive = commTab === tab.id;
@@ -950,6 +959,137 @@ export default function AgentPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* ═══ ASI ACTIVITY TAB ═══ */}
+            {commTab === 'asi' && (
+              <div className="p-5 space-y-6">
+                {/* Overall Threat Level */}
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-red-500/[0.06] to-violet-500/[0.06] border border-white/5">
+                  <Shield className="w-5 h-5 text-red-400" />
+                  <div className="flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/40">Overall Threat Level</span>
+                    <div className="text-sm font-black text-white/80 mt-0.5">
+                      {asiLoading ? 'SCANNING...' : (asiStatus?.overall_threat_level?.toUpperCase() || 'UNKNOWN')}
+                    </div>
+                  </div>
+                  <div className={`w-3 h-3 rounded-full ${
+                    asiStatus?.overall_threat_level === 'nominal' || asiStatus?.overall_threat_level === 'low'
+                      ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]'
+                      : asiStatus?.overall_threat_level === 'elevated'
+                        ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.6)] animate-pulse'
+                        : asiStatus?.overall_threat_level === 'critical'
+                          ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.6)] animate-pulse'
+                          : 'bg-white/20'
+                  }`} />
+                </div>
+
+                {asiLoading && !asiStatus ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-white/20">
+                    <Activity className="w-8 h-8 mb-3 animate-spin" />
+                    <span className="text-sm">Loading ASI subsystems...</span>
+                  </div>
+                ) : !asiStatus ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-white/20">
+                    <Shield className="w-8 h-8 mb-3" />
+                    <span className="text-sm">ASI endpoint unavailable</span>
+                    <span className="text-[11px] mt-1 text-white/10">Backend may not expose /asi/status</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Cortex */}
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+                      className="bg-violet-500/[0.04] border border-violet-500/10 rounded-xl p-4 hover:border-violet-500/25 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BrainCircuit className="w-4 h-4 text-violet-400" />
+                        <span className="text-[11px] font-bold text-white/70">Cortex</span>
+                        <StatusDot status={asiStatus.cortex?.status === 'active' || asiStatus.cortex?.status === 'ready' ? 'connected' : 'pending'} />
+                      </div>
+                      <div className="text-[10px] text-white/30 leading-relaxed">{asiStatus.cortex?.description || 'Cognitive processing core'}</div>
+                      <div className="mt-2 text-[9px] font-mono text-violet-400/50 uppercase">{asiStatus.cortex?.status || 'offline'}</div>
+                    </motion.div>
+
+                    {/* Kernel Mutator */}
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+                      className="bg-cyan-500/[0.04] border border-cyan-500/10 rounded-xl p-4 hover:border-cyan-500/25 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Cpu className="w-4 h-4 text-cyan-400" />
+                        <span className="text-[11px] font-bold text-white/70">Kernel Mutator</span>
+                        <StatusDot status={asiStatus.kernel_mutator?.status === 'active' || asiStatus.kernel_mutator?.status === 'ready' ? 'connected' : 'pending'} />
+                      </div>
+                      <div className="text-[10px] text-white/30 leading-relaxed">{asiStatus.kernel_mutator?.description || 'Runtime kernel mutation engine'}</div>
+                      <div className="mt-2 flex items-center gap-3 text-[9px] font-mono text-cyan-400/50">
+                        {asiStatus.kernel_mutator?.intelligence_factor != null && <span>IQ: {asiStatus.kernel_mutator.intelligence_factor.toFixed(1)}</span>}
+                        {asiStatus.kernel_mutator?.numba_available != null && <span>Numba: {asiStatus.kernel_mutator.numba_available ? '✓' : '✗'}</span>}
+                        <span className="uppercase">{asiStatus.kernel_mutator?.status || 'offline'}</span>
+                      </div>
+                    </motion.div>
+
+                    {/* Containment Grid */}
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+                      className="bg-red-500/[0.04] border border-red-500/10 rounded-xl p-4 hover:border-red-500/25 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="w-4 h-4 text-red-400" />
+                        <span className="text-[11px] font-bold text-white/70">Containment Grid</span>
+                        <StatusDot status={asiStatus.containment_grid?.status === 'active' || asiStatus.containment_grid?.status === 'ready' ? 'connected' : 'pending'} />
+                      </div>
+                      <div className="text-[10px] text-white/30 leading-relaxed">{asiStatus.containment_grid?.description || 'ASI safety containment perimeter'}</div>
+                      <div className="mt-2 flex items-center gap-3 text-[9px] font-mono text-red-400/50">
+                        {asiStatus.containment_grid?.security_triad && <span>Triad: {asiStatus.containment_grid.security_triad.join(' · ')}</span>}
+                        <span className="uppercase">{asiStatus.containment_grid?.status || 'offline'}</span>
+                      </div>
+                    </motion.div>
+
+                    {/* Parasitic Sentinel */}
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                      className="bg-amber-500/[0.04] border border-amber-500/10 rounded-xl p-4 hover:border-amber-500/25 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-400" />
+                        <span className="text-[11px] font-bold text-white/70">Parasitic Sentinel</span>
+                        <StatusDot status={asiStatus.parasitic_sentinel?.status === 'active' || asiStatus.parasitic_sentinel?.status === 'ready' ? 'connected' : 'pending'} />
+                      </div>
+                      <div className="text-[10px] text-white/30 leading-relaxed">{asiStatus.parasitic_sentinel?.description || 'Compilation interception & threat blocking'}</div>
+                      <div className="mt-2 flex items-center gap-3 text-[9px] font-mono text-amber-400/50">
+                        {asiStatus.parasitic_sentinel?.compilations_intercepted != null && <span>Intercepted: {asiStatus.parasitic_sentinel.compilations_intercepted}</span>}
+                        {asiStatus.parasitic_sentinel?.threats_blocked != null && <span>Blocked: {asiStatus.parasitic_sentinel.threats_blocked}</span>}
+                        <span className="uppercase">{asiStatus.parasitic_sentinel?.status || 'offline'}</span>
+                      </div>
+                    </motion.div>
+
+                    {/* Ontological Sandbox */}
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+                      className="bg-emerald-500/[0.04] border border-emerald-500/10 rounded-xl p-4 hover:border-emerald-500/25 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Terminal className="w-4 h-4 text-emerald-400" />
+                        <span className="text-[11px] font-bold text-white/70">Ontological Sandbox</span>
+                        <StatusDot status={asiStatus.ontological_sandbox?.status === 'active' || asiStatus.ontological_sandbox?.status === 'ready' ? 'connected' : 'pending'} />
+                      </div>
+                      <div className="text-[10px] text-white/30 leading-relaxed">{asiStatus.ontological_sandbox?.description || 'Safe code execution sandbox'}</div>
+                      <div className="mt-2 flex items-center gap-3 text-[9px] font-mono text-emerald-400/50">
+                        {asiStatus.ontological_sandbox?.executions != null && <span>Runs: {asiStatus.ontological_sandbox.executions}</span>}
+                        {asiStatus.ontological_sandbox?.blocked != null && <span>Blocked: {asiStatus.ontological_sandbox.blocked}</span>}
+                        <span className="uppercase">{asiStatus.ontological_sandbox?.status || 'offline'}</span>
+                      </div>
+                    </motion.div>
+
+                    {/* Polymorphic Parasite */}
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+                      className="bg-pink-500/[0.04] border border-pink-500/10 rounded-xl p-4 hover:border-pink-500/25 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Network className="w-4 h-4 text-pink-400" />
+                        <span className="text-[11px] font-bold text-white/70">Polymorphic Parasite</span>
+                        <StatusDot status={asiStatus.polymorphic_parasite?.status === 'active' || asiStatus.polymorphic_parasite?.status === 'ready' ? 'connected' : 'pending'} />
+                      </div>
+                      <div className="text-[10px] text-white/30 leading-relaxed">{asiStatus.polymorphic_parasite?.description || 'Distributed compute grid'}</div>
+                      <div className="mt-2 flex items-center gap-3 text-[9px] font-mono text-pink-400/50">
+                        {asiStatus.polymorphic_parasite?.grid_nodes != null && <span>Nodes: {asiStatus.polymorphic_parasite.grid_nodes}</span>}
+                        {asiStatus.polymorphic_parasite?.total_free_vcpus != null && <span>vCPUs: {asiStatus.polymorphic_parasite.total_free_vcpus}</span>}
+                        <span className="uppercase">{asiStatus.polymorphic_parasite?.status || 'offline'}</span>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Footer Status Bar */}
