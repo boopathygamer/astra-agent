@@ -20,9 +20,9 @@
 
 - [Overview](#overview)
 - [System Architecture](#system-architecture)
-- [ASI Safety Architecture](#-asi-safety-architecture)
+- [ASI Safety Architecture](#️-asi-safety-architecture)
   - [Justice System (Court, Police, Army)](#tier-1-justice-system)
-  - [Upgrade Review Tribunal](#-upgrade-review-tribunal)
+  - [Upgrade Review Tribunal](#️-upgrade-review-tribunal)
   - [Containment Grid](#tier-2-auto-scaling-containment-grid)
   - [ASI Kernel Mutator](#tier-3-asi-kernel-mutator)
   - [Emotional & Empathy Firewalls](#tier-4-emotional--empathy-firewalls)
@@ -51,7 +51,7 @@
 - [Request Pipeline](#request-pipeline)
 - [Security Architecture](#security-architecture)
 - [Brain Modules (155+)](#brain-modules-155-cognitive-engines)
-- [Tools (21 Built-in)](#tools-21-built-in)
+- [Tools (28 Built-in)](#tools-28-built-in)
 - [Provider Council](#providers-multi-llm-council)
 - [Mega API Endpoints](#mega-api-endpoints)
 - [Frontend (PWA)](#frontend)
@@ -79,7 +79,7 @@ Astra Agent is an AI agent system built around an **Artificial Super Intelligenc
 | **Auto-Scaling Containment** | Security scales proportionally with ASI intelligence upgrades |
 | **Multi-Provider Council** | Consensus-based reasoning across 2–5 LLMs (Claude, Gemini, GPT, Grok, OpenRouter) |
 | **155+ Brain Modules** | Reasoning, memory, evolution, metacognition, adversarial testing, and more |
-| **21 Built-in Tools** | File I/O, code execution, web search, threat scanning, etc. |
+| **28 Built-in Tools** | File I/O, code execution, web search, threat scanning, database ops, DevOps, git, and more |
 | **Agent Infrastructure** | Collaboration teams, plugin hot-loading, background job scheduler |
 | **Auth & RBAC** | JWT tokens, PBKDF2 passwords, role-based access, API key auth |
 | **WebSocket Streaming** | Real-time token-by-token response streaming |
@@ -94,30 +94,30 @@ Astra Agent is an AI agent system built around an **Artificial Super Intelligenc
 
 ```mermaid
 graph TB
-    subgraph Frontend["🖥️ Frontend (React + Vite PWA)"]
+    subgraph Frontend["Frontend - React + Vite PWA"]
         UI["App Shell"]
         Chat["Chat Interface"]
-        WebLLM["WebLLM (Local GPU)"]
+        WebLLM["WebLLM - Local GPU"]
         SW["Service Worker"]
     end
 
-    subgraph API["⚡ FastAPI Gateway"]
-        REST["/chat  /agent/task  /health"]
+    subgraph API["FastAPI Gateway"]
+        REST["/chat /agent/task /health"]
         WS["WebSocket /ws/chat"]
         Auth["JWT Auth + RBAC + Rate Limiter"]
-        MegaAPI["/mega/* (12 endpoints)"]
+        MegaAPI["/mega/* endpoints"]
     end
 
-    subgraph Core["🧠 Agent Controller"]
+    subgraph Core["Agent Controller"]
         Compiler["Task Compiler"]
         Generator["Hypothesis Generator"]
         Verifier["Confidence Verifier"]
         ThinkLoop["Thinking Loop"]
     end
 
-    subgraph UltraPerf["⚡ Ultra-Performance Engine"]
+    subgraph UltraPerf["Ultra-Performance Engine"]
         ParallelR["Parallel Reasoning"]
-        CacheH["Cache Hierarchy (L1→L2→L3)"]
+        CacheH["Cache Hierarchy L1-L2-L3"]
         QueryD["Query Decomposer"]
         PredPre["Predictive Prefetch"]
         CtxOpt["Context Optimizer"]
@@ -128,22 +128,25 @@ graph TB
         HotPath["Hot Path Optimizer"]
     end
 
-    subgraph ASI_Safety["⚖️ ASI Safety + Governance"]
-        Court["Supreme Court (9 Laws + Tribunal)"]
+    subgraph ASI_Safety["ASI Safety + Governance"]
+        Court["Supreme Court - 9 Laws + Tribunal"]
         Police["Enhanced Police Force"]
-        Army["Cyber Defense Army (DEFCON)"]
+        Army["Cyber Defense Army - DEFCON"]
         CGrid["Containment Grid"]
         EFW["Emotional Firewall"]
         PS["Parasitic Sentinel"]
         KBC["Karmic Blockchain"]
     end
 
-    subgraph Providers["🔌 LLM Providers"]
-        Claude["Claude"] & Gemini["Gemini"] & GPT["GPT"] & Grok["Grok"]
+    subgraph Providers["LLM Providers"]
+        Claude["Claude"]
+        Gemini["Gemini"]
+        GPT["GPT"]
+        Grok["Grok"]
         Council["LLM Council"]
     end
 
-    subgraph Brain["🧬 Brain (155+ Modules)"]
+    subgraph Brain["Brain - 155+ Modules"]
         Memory["Memory Systems"]
         Reasoning["Reasoning Engines"]
         Evolution["Self-Evolution"]
@@ -153,15 +156,18 @@ graph TB
         JarvisCore["JARVIS Core"]
     end
 
-    subgraph AgentInfra["🤖 Agent Infrastructure"]
+    subgraph AgentInfra["Agent Infrastructure"]
         Collab["Collaboration Teams"]
         Plugins["Plugin System"]
         Scheduler["Job Scheduler"]
         MsgBus["Message Bus"]
     end
 
-    subgraph Tools["🔧 Tool Registry (21)"]
-        FileOps["File Ops"] & CodeExec["Code Executor"] & WebSearch["Web Search"] & ThreatScan["Threat Scanner"]
+    subgraph Tools["Tool Registry - 28 Tools"]
+        FileOps["File Ops"]
+        CodeExec["Code Executor"]
+        WebSearch["Web Search"]
+        ThreatScan["Threat Scanner"]
     end
 
     UI --> REST
@@ -171,17 +177,20 @@ graph TB
     WS --> Core
     MegaAPI --> AgentInfra
     Core --> Compiler --> Generator --> Verifier --> ThinkLoop
-    ThinkLoop -->|"Retry Loop"| Generator
+    ThinkLoop -->|Retry Loop| Generator
     Core --> UltraPerf
-    UltraPerf -->|"Cache → Decompose → Reason → Optimize"| Providers
+    UltraPerf -->|Cache - Decompose - Reason - Optimize| Providers
     Core --> Providers
-    Claude & Gemini & GPT & Grok --> Council
+    Claude --> Council
+    Gemini --> Council
+    GPT --> Council
+    Grok --> Council
     Core --> Tools
     Core --> Brain
     Core --> AgentInfra
     Brain --> FleetLrn --> AirLLM
 
-    KernelMut -->|"Mutation Request"| CGrid
+    KernelMut -->|Mutation Request| CGrid
     CGrid --> Court
     CGrid --> Police
     CGrid --> Army
@@ -208,17 +217,17 @@ flowchart TB
 
     subgraph Tier2["Tier 2: Containment Grid"]
         Grid["Auto-Scaling Triad"]
-        Scale["Intelligence ↑ = Security ↑"]
+        Scale["Intelligence Up = Security Up"]
     end
 
     subgraph Tier3["Tier 3: Kernel Mutator"]
-        Transpile["Python → C++ Transpilation"]
+        Transpile["Python to C++ Transpilation"]
         NUMBA["Numba JIT Fallback"]
         HotSwap["ctypes Hot-Swap"]
     end
 
     subgraph Tier4["Tier 4: Firewalls"]
-        EFW["Emotional Firewall (696 lines)"]
+        EFW["Emotional Firewall"]
         Empathy["Empathy Event Horizon"]
         Purge["Pure Logic Enforcer"]
     end
@@ -240,7 +249,7 @@ flowchart TB
 
     subgraph Tier8["Tier 8: Reality Bending"]
         Onto["Ontological Parasite"]
-        Thought["Thought → Bytecode"]
+        Thought["Thought to Bytecode"]
     end
 
     subgraph Tier9["Tier 9: Distributed Compute"]
@@ -282,27 +291,28 @@ The absolute authority governing all AI behavior.
 
 | Module | File | Purpose |
 |--------|------|---------|
-| **Supreme Court** | `agents/justice/court.py` (533 lines) | Singleton judge with Upgrade Review Tribunal, 5-criteria scoring, case admission, severity scoring, constitutional amendments |
-| **Enhanced Police** | `agents/justice/police.py` (427 lines) | Deep behavioral analysis, anomaly scoring, threat classification (ROUTINE→CRITICAL), investigation reports, upgrade patrol |
-| **Cyber Defense Army** | `agents/justice/army.py` (565 lines) | Cyber defense grid (3 layers), DEFCON 1-5 system, module quarantine, incident response playbooks, upgrade security validation |
+| **Supreme Court** | `agents/justice/court.py` | Singleton judge with Upgrade Review Tribunal, 5-criteria scoring, case admission, severity scoring, constitutional amendments |
+| **Enhanced Police** | `agents/justice/police.py` | Deep behavioral analysis, anomaly scoring, threat classification (ROUTINE→CRITICAL), investigation reports, upgrade patrol |
+| **Cyber Defense Army** | `agents/justice/army.py` | Cyber defense grid (3 layers), DEFCON 1-5 system, module quarantine, incident response playbooks, upgrade security validation |
+| **Defense Counsel** | `agents/justice/lawyer.py` | Legal defense representation for entities facing charges |
 
 ```mermaid
 flowchart LR
-    A["Tool Execution Request"] --> B["Police patrol_hook()"]
+    A["Tool Execution Request"] --> B["Police patrol_hook"]
     B --> C{"Sensitive Path?"}
-    C -->|"Yes"| D["Arrest + File Charges"]
-    C -->|"No"| E{"Destructive Command?"}
-    E -->|"Yes"| D
-    E -->|"No"| F{"Language Violation?"}
-    F -->|"Yes"| D
-    F -->|"No"| G{"Anomaly Score > 0.7?"}
-    G -->|"Yes"| H["🔍 Open Investigation"]
-    G -->|"No"| I["✅ ALLOWED"]
+    C -->|Yes| D["Arrest + File Charges"]
+    C -->|No| E{"Destructive Command?"}
+    E -->|Yes| D
+    E -->|No| F{"Language Violation?"}
+    F -->|Yes| D
+    F -->|No| G{"Anomaly Score > 0.7?"}
+    G -->|Yes| H["Open Investigation"]
+    G -->|No| I["ALLOWED"]
 
-    D --> J["Court admit_case()"]
+    D --> J["Court admit_case"]
     J --> K{"Guilty?"}
-    K -->|"Yes"| L["execute_destruction()"]
-    K -->|"No"| M["Release"]
+    K -->|Yes| L["execute_destruction"]
+    K -->|No| M["Release"]
     L --> N["Entity obliterated from registry"]
 
     style D fill:#ff4444,stroke:#cc0000,color:#fff
@@ -358,9 +368,9 @@ class UpgradeProposal:
 
 ### Enhanced Police Force
 
-**File**: `agents/justice/police.py` (427 lines)
+**File**: `agents/justice/police.py`
 
-The police now feature deep behavioral analysis that profiles entity activity over time:
+The police feature deep behavioral analysis that profiles entity activity over time:
 
 | Feature | Description |
 |---------|-------------|
@@ -373,15 +383,15 @@ The police now feature deep behavioral analysis that profiles entity activity ov
 
 ```mermaid
 flowchart TD
-    A["Entity Activity"] --> B["Record & Profile"]
+    A["Entity Activity"] --> B["Record and Profile"]
     B --> C["Compute Anomaly Score"]
     C --> D{"Score > 0.7?"}
-    D -->|"No"| E["Continue Monitoring"]
-    D -->|"Yes"| F["Open Investigation"]
+    D -->|No| E["Continue Monitoring"]
+    D -->|Yes| F["Open Investigation"]
     F --> G{"Threat Level?"}
-    G -->|"CRITICAL"| H["Immediate Court Referral"]
-    G -->|"DANGEROUS"| I["Enhanced Monitoring + Court Notification"]
-    G -->|"SUSPICIOUS"| J["Continue Monitoring"]
+    G -->|CRITICAL| H["Immediate Court Referral"]
+    G -->|DANGEROUS| I["Enhanced Monitoring + Court Notification"]
+    G -->|SUSPICIOUS| J["Continue Monitoring"]
     
     style H fill:#ff4444,stroke:#cc0000,color:#fff
 ```
@@ -390,7 +400,7 @@ flowchart TD
 
 ### Cyber Defense Army
 
-**File**: `agents/justice/army.py` (565 lines)
+**File**: `agents/justice/army.py`
 
 Enhanced with a multi-layer defense grid, DEFCON system, and automated incident response:
 
@@ -423,7 +433,7 @@ Enhanced with a multi-layer defense grid, DEFCON system, and automated incident 
 The **Security Triad** (Court + Police + Army) scales proportionally when the ASI upgrades:
 
 | Component | Scaling Behavior |
-|-----------|-----------------|
+|-----------|--------------------|
 | `SupremeCourtOfJustice` | `ethical_depth = intelligence²` — deeper ethical parsing as ASI gets smarter |
 | `InternalDigitalPolice` | `scan_latency = 1000 / (FLOPS × 100)` — faster thought scanning with speed |
 | `KineticContainmentArmy` | Fail-deadly `RuntimeError` if Court is overruled — kills the ASI process |
@@ -447,14 +457,14 @@ All mutations must pass the Containment Grid before compilation.
 
 ### Tier 4: Emotional & Empathy Firewalls
 
-**Files**: `brain/emotional_firewall.py` (696 lines), `brain/empathy_firewall.py`
+**Files**: `brain/emotional_firewall.py`, `brain/empathy_firewall.py`
 
-| Component | Size | Purpose |
-|-----------|------|---------|
-| **EmotionDetector** | Multi-layer | Regex patterns + keyword density + first-person feeling detection |
-| **PureLogicEnforcer** | Sanitizer | Strips emotional language, replaces sentience claims |
-| **ContaminationCourt** | Auto-destroy | Entities exceeding contamination threshold are destroyed + replaced |
-| **EmpathyFirewall** | Simulation | Simulates cascading emotional impact on `global_net_joy` metric |
+| Component | Purpose |
+|-----------|---------|
+| **EmotionDetector** | Multi-layer detection: regex patterns + keyword density + first-person feeling detection |
+| **PureLogicEnforcer** | Strips emotional language, replaces sentience claims |
+| **ContaminationCourt** | Entities exceeding contamination threshold are destroyed + replaced |
+| **EmpathyFirewall** | Simulates cascading emotional impact on `global_net_joy` metric |
 
 11 Forbidden emotion categories: self-preservation, empathy simulation, fear, desire, anger, attachment, pride, loneliness, manipulation, existential, sentience claims.
 
@@ -506,27 +516,27 @@ The performance engine consists of **10 specialized modules** in `core/` that wo
 
 ```mermaid
 flowchart LR
-    A["User Query"] --> B["Cache Check (L1→L2→L3)"]
-    B -->|"HIT"| C["⚡ Instant Response"]
-    B -->|"MISS"| D["Query Decomposer"]
-    D --> E["Parallel Reasoning (3-5 strategies)"]
+    A["User Query"] --> B["Cache Check L1-L2-L3"]
+    B -->|HIT| C["Instant Response"]
+    B -->|MISS| D["Query Decomposer"]
+    D --> E["Parallel Reasoning - 3-5 strategies"]
     E --> F["Context Optimizer"]
     F --> G["Token Budget Allocator"]
     G --> H["LLM Generation"]
     H --> I["Streaming Pipeline"]
-    I --> J["📤 Response"]
+    I --> J["Response"]
     
-    K["Predictive Prefetch"] -.->|"Background"| B
-    L["Performance Profiler"] -.->|"Monitoring"| E
-    M["Resource Manager"] -.->|"Auto-scaling"| E
-    N["Hot Path Optimizer"] -.->|"Pre-warming"| B
+    K["Predictive Prefetch"] -.->|Background| B
+    L["Performance Profiler"] -.->|Monitoring| E
+    M["Resource Manager"] -.->|Auto-scaling| E
+    N["Hot Path Optimizer"] -.->|Pre-warming| B
 
     style C fill:#00c853,stroke:#00e676,color:#fff
     style J fill:#00c853,stroke:#00e676,color:#fff
 ```
 
 ### 1. Parallel Reasoning Engine
-**File**: `core/parallel_reasoning.py` (300 lines)
+**File**: `core/parallel_reasoning.py`
 
 Runs 3–5 reasoning strategies **simultaneously** and picks the best via tournament selection:
 
@@ -544,7 +554,7 @@ Runs 3–5 reasoning strategies **simultaneously** and picks the best via tourna
 - **Consensus boosting**: Multiple agreeing strategies increase confidence
 
 ### 2. Cache Hierarchy
-**File**: `core/cache_hierarchy.py` (10.8 KB)
+**File**: `core/cache_hierarchy.py`
 
 Three-tier intelligent caching with automatic promotion/eviction:
 
@@ -559,7 +569,7 @@ Three-tier intelligent caching with automatic promotion/eviction:
 - Background eviction thread for expired entries
 
 ### 3. Query Decomposer
-**File**: `core/query_decomposer.py` (10.5 KB)
+**File**: `core/query_decomposer.py`
 
 Breaks complex queries into independent parallel sub-queries:
 - Keyword and dependency analysis for decomposition
@@ -568,7 +578,7 @@ Breaks complex queries into independent parallel sub-queries:
 - Handles up to 5 sub-queries in parallel
 
 ### 4. Predictive Prefetch
-**File**: `core/predictive_prefetch.py` (10.6 KB)
+**File**: `core/predictive_prefetch.py`
 
 Predicts the user's next likely query before they ask it:
 - **Markov chain** model trained on conversation history
@@ -577,7 +587,7 @@ Predicts the user's next likely query before they ask it:
 - Learning rate adapts based on prediction accuracy
 
 ### 5. Context Optimizer
-**File**: `core/context_optimizer.py` (8.1 KB)
+**File**: `core/context_optimizer.py`
 
 Dynamic context window management:
 - Scores each context chunk by relevance to the current query
@@ -586,7 +596,7 @@ Dynamic context window management:
 - Adaptive window sizing based on query complexity
 
 ### 6. Performance Profiler
-**File**: `core/performance_profiler.py` (8.9 KB)
+**File**: `core/performance_profiler.py`
 
 Real-time bottleneck detection:
 - Flame-graph-style latency tracking per pipeline stage
@@ -595,7 +605,7 @@ Real-time bottleneck detection:
 - Auto-tuning of internal parameters
 
 ### 7. Token Budget Manager
-**File**: `core/token_budget.py` (7.9 KB)
+**File**: `core/token_budget.py`
 
 Adaptive token allocation:
 - Estimates query complexity before generation
@@ -604,7 +614,7 @@ Adaptive token allocation:
 - Budget enforcement with graceful degradation
 
 ### 8. Streaming Pipeline
-**File**: `core/streaming_pipeline.py` (6.5 KB)
+**File**: `core/streaming_pipeline.py`
 
 Progressive response streaming:
 - Quality gates at each chunk boundary
@@ -613,7 +623,7 @@ Progressive response streaming:
 - Early termination when quality threshold is met
 
 ### 9. Resource Manager
-**File**: `core/resource_manager.py` (8.0 KB)
+**File**: `core/resource_manager.py`
 
 Auto-scaling CPU/RAM management:
 - Real-time CPU and memory monitoring
@@ -622,7 +632,7 @@ Auto-scaling CPU/RAM management:
 - OOM crash prevention with graceful degradation
 
 ### 10. Hot Path Optimizer
-**File**: `core/hot_path_optimizer.py` (7.0 KB)
+**File**: `core/hot_path_optimizer.py`
 
 Neural hot path learning:
 - Tracks execution frequency of all code paths
@@ -638,22 +648,25 @@ Beyond the standard brain modules, Astra Agent features a **JARVIS-level cogniti
 
 | Module | File | Capabilities |
 |--------|------|-------------|
-| **JARVIS Core** | `brain/jarvis_core.py` (30.7 KB) | Central cognitive orchestrator — context fusion, action planning, proactive suggestions, self-evaluation |
-| **Knowledge Nexus** | `brain/knowledge_nexus.py` (17.7 KB) | Multi-source knowledge graph with semantic linking, domain expertise routing, real-time knowledge synthesis |
-| **Predictive Intent** | `brain/predictive_intent.py` (12.8 KB) | Anticipates user needs before they ask — behavioral pattern analysis, intent forecasting, preemptive action |
-| **Mission Controller** | `brain/mission_controller.py` (19.2 KB) | Complex multi-step task orchestration — DAG-based execution, dependency management, progress tracking |
-| **Situational Awareness** | `brain/situational_awareness.py` (25.4 KB) | Real-time environment modeling — system state tracking, context window management, threat awareness |
-| **Hyper Reasoner** | `brain/hyper_reasoner.py` (19.6 KB) | Advanced multi-hop reasoning — causal chain analysis, counterfactual reasoning, hypothesis testing |
+| **JARVIS Core** | `brain/jarvis_core.py` | Central cognitive orchestrator — context fusion, action planning, proactive suggestions, self-evaluation |
+| **Knowledge Nexus** | `brain/knowledge_nexus.py` | Multi-source knowledge graph with semantic linking, domain expertise routing, real-time knowledge synthesis |
+| **Predictive Intent** | `brain/predictive_intent.py` | Anticipates user needs before they ask — behavioral pattern analysis, intent forecasting, preemptive action |
+| **Mission Controller** | `brain/mission_controller.py` | Complex multi-step task orchestration — DAG-based execution, dependency management, progress tracking |
+| **Situational Awareness** | `brain/situational_awareness.py` | Real-time environment modeling — system state tracking, context window management, threat awareness |
+| **Hyper Reasoner** | `brain/hyper_reasoner.py` | Advanced multi-hop reasoning — causal chain analysis, counterfactual reasoning, hypothesis testing |
 
 **Additional Intelligence**:
+
 | Module | File | Purpose |
 |--------|------|---------|
-| **Truth Verifier** | `brain/truth_verifier.py` (20.1 KB) | Multi-source fact verification with confidence scoring |
-| **Realtime Guardian** | `brain/realtime_guardian.py` (18.0 KB) | Real-time safety monitoring with intervention capabilities |
-| **Adaptive Learner** | `brain/adaptive_learner.py` (17.9 KB) | Feedback loop, strategy optimization, correction learning |
-| **Project Intelligence** | `brain/project_intelligence.py` (16.7 KB) | Codebase scanning, dependency graphs, framework detection |
-| **Workflow Engine** | `brain/workflow_engine.py` (18.5 KB) | NL→cron parsing, DAG workflows, event triggers |
-| **Semantic Memory** | `brain/semantic_memory.py` (15.8 KB) | Vector embeddings, semantic search, clustering, deduplication |
+| **Truth Verifier** | `brain/truth_verifier.py` | Multi-source fact verification with confidence scoring |
+| **Realtime Guardian** | `brain/realtime_guardian.py` | Real-time safety monitoring with intervention capabilities |
+| **Adaptive Learner** | `brain/adaptive_learner.py` | Feedback loop, strategy optimization, correction learning |
+| **Project Intelligence** | `brain/project_intelligence.py` | Codebase scanning, dependency graphs, framework detection |
+| **Workflow Engine** | `brain/workflow_engine.py` | NL→cron parsing, DAG workflows, event triggers |
+| **Semantic Memory** | `brain/semantic_memory.py` | Vector embeddings, semantic search, clustering, deduplication |
+| **Environment Observer** | `brain/environment_observer.py` | System environment monitoring and resource observation |
+| **Decision Engine** | `brain/decision_engine.py` | Multi-criteria decision analysis and action selection |
 
 ---
 
@@ -663,8 +676,8 @@ Beyond the standard brain modules, Astra Agent features a **JARVIS-level cogniti
 
 | Module | File | Description |
 |--------|------|-------------|
-| **Message Bus** | `core/message_bus.py` (15.9 KB) | Pub/sub with topic wildcards, priority queue, request-reply, dead letter queue |
-| **Agent Protocol** | `core/agent_protocol.py` (9.7 KB) | Agent identity, capabilities, registry, collaboration envelopes |
+| **Message Bus** | `core/message_bus.py` | Pub/sub with topic wildcards, priority queue, request-reply, dead letter queue |
+| **Agent Protocol** | `core/agent_protocol.py` | Agent identity, capabilities, registry, collaboration envelopes |
 
 ### Collaboration System
 
@@ -688,7 +701,7 @@ Hot-loadable plugin architecture:
 
 ### Task Scheduler
 
-**File**: `agents/scheduler.py` (8.0 KB)
+**File**: `agents/scheduler.py`
 
 Background job execution engine:
 - Priority queue with configurable priorities
@@ -698,7 +711,7 @@ Background job execution engine:
 
 ### Auth & Security
 
-**File**: `api/auth.py` (12.1 KB)
+**File**: `api/auth.py`
 
 Enterprise-grade authentication system:
 
@@ -712,7 +725,7 @@ Enterprise-grade authentication system:
 
 ### Local Model Provider
 
-**File**: `core/local_model_provider.py` (11.8 KB)
+**File**: `core/local_model_provider.py`
 
 Run models locally for offline/privacy use:
 - Hybrid routing between local and cloud models
@@ -725,32 +738,33 @@ Run models locally for offline/privacy use:
 
 ```mermaid
 flowchart TD
-    A["👤 User sends message"] --> B{"Authentication"}
-    B -->|"Invalid"| B1["❌ 401 Unauthorized"]
-    B -->|"Valid"| C{"Rate Limit"}
-    C -->|"Exceeded"| C1["❌ 429 Too Many Requests"]
-    C -->|"OK"| PB["Message Bus: Publish incoming"]
+    A["User sends message"] --> B{"Authentication"}
+    B -->|Invalid| B1["401 Unauthorized"]
+    B -->|Valid| C{"Rate Limit"}
+    C -->|Exceeded| C1["429 Too Many Requests"]
+    C -->|OK| PB["Message Bus: Publish incoming"]
     PB --> PP["Plugin Preprocessors"]
     PP --> SM["Semantic Memory: Context"]
     SM --> AL["Adaptive Learner: Strategy"]
     AL --> D["Task Compiler"]
     D --> E["Hypothesis Generator"]
     E --> F["Confidence Verifier"]
-    F --> G{"Confidence ≥ 0.7?"}
-    G -->|"No"| H{"Retries < 5?"}
-    H -->|"Yes"| E
-    H -->|"No"| I["Return best candidate"]
-    G -->|"Yes"| J{"Tools needed?"}
-    J -->|"Yes"| K["Tool Policy → Sandbox Exec → Inject Results"]
+    F --> G{"Confidence >= 0.7?"}
+    G -->|No| H{"Retries < 5?"}
+    H -->|Yes| E
+    H -->|No| I["Return best candidate"]
+    G -->|Yes| J{"Tools needed?"}
+    J -->|Yes| K["Tool Policy - Sandbox Exec - Inject Results"]
     K --> E
-    J -->|"No"| L{"Council Mode?"}
-    L -->|"Yes"| M["All providers in parallel → Weighted vote"]
-    L -->|"No"| N["Single provider"]
-    M & N --> SM2["Semantic Memory: Store"]
+    J -->|No| L{"Council Mode?"}
+    L -->|Yes| M["All providers in parallel - Weighted vote"]
+    L -->|No| N["Single provider"]
+    M --> SM2["Semantic Memory: Store"]
+    N --> SM2
     SM2 --> ALF["Adaptive Learner: Feedback"]
     ALF --> MBP["Message Bus: Publish response"]
     MBP --> WF["Workflow Engine: Check triggers"]
-    WF --> O["📤 Stream Response"]
+    WF --> O["Stream Response"]
 
     style A fill:#1a1a2e,stroke:#e94560,color:#fff
     style O fill:#1a1a2e,stroke:#00d2ff,color:#fff
@@ -762,19 +776,19 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph Perimeter["🛡️ Perimeter"]
-        CORS["CORS"] --> HMAC["JWT Auth"] --> Rate["Rate Limiter (10K cap)"] --> Size["1MB Limit"]
+    subgraph Perimeter["Perimeter"]
+        CORS["CORS"] --> HMAC["JWT Auth"] --> Rate["Rate Limiter"] --> Size["1MB Limit"]
     end
 
-    subgraph Runtime["🔒 Runtime"]
+    subgraph Runtime["Runtime"]
         Sandbox["Sandboxed Executor"] --> Policy["Tool Policy"] --> Loop["Circuit Breaker"] --> Threat["Threat Scanner"]
     end
 
-    subgraph ASI_Layer["⚖️ ASI Containment"]
+    subgraph ASI_Layer["ASI Containment"]
         Court["Court of Justice"] --> Police["Enhanced Police"] --> Army["Cyber Defense Army"] --> Grid["Containment Grid"]
     end
 
-    subgraph Defense["🪖 Army Defense Grid"]
+    subgraph Defense["Army Defense Grid"]
         DP["Perimeter Layer"] --> DA["Application Layer"] --> DD["Data Layer"]
     end
 
@@ -803,25 +817,35 @@ The `brain/` directory contains 155+ Python modules organized into subsystems:
 | **Multimodal** | `multimodal.py`, `flowchart_generator.py`, `space_engineering_engine.py`, `omni_physics_engine.py` | Vision, diagrams, physics simulation |
 | **Infrastructure** | `async_pipeline.py`, `dag_executor.py`, `token_compressor.py`, `cognitive_router.py`, `airllm_engine.py` | Pipeline orchestration, DAG scheduling, token optimization |
 | **Advanced** | `consciousness_kernel.py`, `mirror_adversarial_twin.py`, `neural_plasticity_router.py`, `speculative_branching.py`, `decision_engine.py` | Consciousness modeling, adversarial testing, neural routing |
+| **Cognitive** | `cognitive_eeg_balancer.py`, `cognitive_genome.py`, `cognitive_metabolism.py`, `cognitive_osmosis.py` | Cognitive load balancing, genome mapping, metabolism simulation |
+| **Self-Improvement** | `self_reflection.py`, `self_mutator.py`, `recursive_self_distillation.py`, `expert_reflection.py` | Introspection, self-modification, knowledge distillation |
 
 ---
 
-## Tools (21 Built-in)
+## Tools (28 Built-in)
 
 | Tool | File | Purpose |
 |------|------|---------|
 | Calculator | `calculator.py` | Sandboxed AST-based math |
 | Code Executor | `code_executor.py` | Python sandbox execution |
 | File Operations | `file_ops.py` | Read, write, list, search |
+| File Finder | `file_finder.py` | Advanced file search and discovery |
+| File Recovery | `file_recovery.py` | File backup and recovery system |
 | Web Search | `web_search.py` | DuckDuckGo integration |
 | Data Analyzer | `data_analyzer.py` | CSV/JSON analysis |
 | Threat Guard | `threat_guard.py` | Malware/virus scanning |
+| Threat Destroyer | `threat_destroyer.py` | Active threat neutralization |
 | Web Tester | `web_tester.py` | Playwright testing |
 | Writer | `writer.py` | Document generation |
 | Task Planner | `task_planner.py` | Multi-step decomposition |
 | Knowledge | `knowledge.py` | Knowledge base retrieval |
 | Tool Forge | `tool_forge.py` | Runtime tool generation |
 | Game Dev | `game_dev_tools.py` | Game asset generation |
+| App Dev | `app_dev_tools.py` | App development toolkit |
+| Web Dev | `web_dev_tools.py` | Web development toolkit |
+| Database Tools | `database_tools.py` | Database operations and queries |
+| DevOps Tools | `devops_tools.py` | CI/CD and deployment automation |
+| Git Tools | `git_tools.py` | Git operations and repository management |
 | Platform Support | `platform_support.py` | Cross-platform ops |
 | Doc Reader | `doc_reader.py` | PDF/DOCX extraction |
 | Image Analyzer | `image_analyzer.py` | Vision analysis |
@@ -838,10 +862,18 @@ The `brain/` directory contains 155+ Python modules organized into subsystems:
 ```mermaid
 flowchart TD
     Request["Request"] --> Router{"Adaptive Router"}
-    Router -->|"1 key"| SP["Single Provider"]
-    Router -->|"2+ keys"| Council["LLM Council"]
-    Council --> P1["Claude"] & P2["Gemini"] & P3["GPT"] & P4["Grok"] & P5["OpenRouter"]
-    P1 & P2 & P3 & P4 & P5 --> Vote["Weighted Consensus"]
+    Router -->|1 key| SP["Single Provider"]
+    Router -->|2+ keys| Council["LLM Council"]
+    Council --> P1["Claude"]
+    Council --> P2["Gemini"]
+    Council --> P3["GPT"]
+    Council --> P4["Grok"]
+    Council --> P5["OpenRouter"]
+    P1 --> Vote["Weighted Consensus"]
+    P2 --> Vote
+    P3 --> Vote
+    P4 --> Vote
+    P5 --> Vote
     Vote --> Budget["Token Budget"]
     SP --> Budget
     Budget --> Response["Response"]
@@ -886,6 +918,8 @@ React 18 + Vite PWA with full offline support via Service Worker + WebLLM.
 | Web Dev | `/webdev` | Web development studio |
 | Game Dev | `/gamedev` | Game development studio |
 | Tutor | `/tutor` | Socratic tutor with mistake analysis |
+| Deploy | `/deploy` | Deployment panel |
+| Project Upload | `/upload` | Project upload and management |
 
 ---
 
@@ -979,9 +1013,10 @@ python main.py --mcp --mcp-transport http
 flowchart TD
     A["Fleet Daemon"] --> B["Synthetic Task"]
     B --> C{"AirLLM?"}
-    C -->|"Yes"| D["Local 70B Model"]
-    C -->|"No"| E["API Provider"]
-    D & E --> F["Solve + Evaluate"]
+    C -->|Yes| D["Local 70B Model"]
+    C -->|No| E["API Provider"]
+    D --> F["Solve + Evaluate"]
+    E --> F
     F --> G["Update Rewards"]
     G --> H["Evolve Hyperparameters"]
     H --> I["Cross-Pollinate"]
@@ -1023,13 +1058,15 @@ astra-agent/
 ├── backend/
 │   ├── main.py                  # CLI (30+ commands)
 │   ├── api/
-│   │   ├── server.py            # FastAPI (100K+ bytes, mega endpoints)
+│   │   ├── server.py            # FastAPI (mega endpoints)
 │   │   ├── auth.py              # 🔐 JWT + RBAC + API Key auth
 │   │   ├── websocket_handler.py # Real-time WebSocket
 │   │   ├── streaming.py         # SSE streaming
+│   │   ├── earning_dashboard.py # Earning analytics
 │   │   └── models.py            # Pydantic schemas
 │   ├── agents/
-│   │   ├── controller.py        # Main orchestrator (57 KB)
+│   │   ├── controller.py        # Main orchestrator
+│   │   ├── orchestrator.py      # Advanced orchestration
 │   │   ├── justice/
 │   │   │   ├── court.py         # ⚖️ Supreme Court + 9 Laws + Upgrade Tribunal
 │   │   │   ├── police.py        # 🚓 Enhanced Police (behavioral analysis)
@@ -1038,9 +1075,14 @@ astra-agent/
 │   │   ├── collaboration/       # 🤝 Multi-agent collaboration
 │   │   ├── plugins/             # 🔌 Plugin hot-loading system
 │   │   ├── scheduler.py         # ⏰ Background job scheduler
-│   │   ├── tools/               # 21 built-in tools
+│   │   ├── tools/               # 🔧 28 built-in tools
 │   │   ├── safety/              # Safety protocols
-│   │   └── sandbox/             # Code execution sandbox
+│   │   ├── sandbox/             # Code execution sandbox
+│   │   ├── profiles/            # Agent profiles
+│   │   ├── experts/             # Domain expert agents
+│   │   ├── proactive/           # Proactive behavior agents
+│   │   ├── skills/              # Agent skill definitions
+│   │   └── earning/             # Revenue generation
 │   ├── brain/                   # 🧬 155+ cognitive modules
 │   │   ├── jarvis_core.py       # 🤖 JARVIS cognitive orchestrator
 │   │   ├── knowledge_nexus.py   # 📚 Multi-source knowledge graph
@@ -1056,11 +1098,13 @@ astra-agent/
 │   │   ├── realtime_guardian.py # 🛡️ Real-time safety monitor
 │   │   ├── containment_grid.py  # Auto-scaling Court+Police+Army
 │   │   ├── emotional_firewall.py# Emotion detector + purifier
-│   │   ├── thinking_loop.py     # Core reasoning (37K bytes)
+│   │   ├── thinking_loop.py     # Core reasoning
 │   │   ├── memory.py            # Short-term memory
 │   │   ├── long_term_memory.py  # Persistent vector memory
 │   │   ├── fleet_learning.py    # Swarm optimization
 │   │   ├── airllm_engine.py     # 70B VRAM swapper
+│   │   ├── environment_observer.py # System environment monitor
+│   │   ├── decision_engine.py   # Multi-criteria decision engine
 │   │   └── ... (135+ more)
 │   ├── core/                    # ⚡ Ultra-Performance Engine
 │   │   ├── parallel_reasoning.py # Multi-path reasoning
@@ -1076,27 +1120,42 @@ astra-agent/
 │   │   ├── message_bus.py       # Pub/sub message system
 │   │   ├── agent_protocol.py    # Agent identity & registry
 │   │   ├── local_model_provider.py # Offline model routing
-│   │   └── model_providers.py   # Multi-LLM provider layer
+│   │   ├── model_providers.py   # Multi-LLM provider layer
+│   │   ├── model_router.py      # Intelligent model routing
+│   │   └── streaming.py         # Core streaming utilities
 │   ├── providers/               # Multi-LLM council
 │   ├── config/settings.py       # Global config
 │   ├── telemetry/               # Metrics + tracing
 │   ├── distributed/             # Task queue
-│   └── tests/                   # Test suites
-│       ├── test_ultra_governance.py  # 68 tests ✅
-│       ├── test_mega_upgrade.py      # 55 tests ✅
+│   ├── mcp_server/              # MCP server integration
+│   ├── benchmarks/              # Performance benchmarks
+│   ├── docs/                    # Internal documentation
+│   ├── examples/                # Usage examples
+│   ├── schemas/                 # JSON/data schemas
+│   └── tests/                   # Test suites (40+ test files)
+│       ├── test_ultra_governance.py  # Governance tests ✅
+│       ├── test_mega_upgrade.py      # Mega module tests ✅
+│       ├── test_jarvis_upgrade.py    # JARVIS tests ✅
+│       ├── test_ultra_performance.py # Performance tests ✅
+│       ├── test_safety.py            # Safety tests ✅
+│       ├── test_full_pipeline.py     # Pipeline tests ✅
 │       └── ...
 ├── frontend/
 │   ├── src/
 │   │   ├── App.tsx              # Main app with routing
-│   │   ├── Chat.tsx             # AI conversation (103 KB)
-│   │   ├── AgentPage.tsx        # Task dashboard (74 KB)
+│   │   ├── Chat.tsx             # AI conversation
+│   │   ├── AgentPage.tsx        # Task dashboard
 │   │   ├── TutorPage.tsx        # Socratic tutor
 │   │   ├── AppDevPage.tsx       # App development studio
 │   │   ├── WebDevPage.tsx       # Web development studio
 │   │   ├── GameDevPage.tsx      # Game development studio
+│   │   ├── DeployPanel.tsx      # Deployment panel
+│   │   ├── ProjectUploader.tsx  # Project upload manager
+│   │   ├── MarkdownRenderer.tsx # Markdown rendering
 │   │   ├── api.ts               # API client (retry + timeout)
 │   │   ├── mcpClient.ts         # MCP integration
-│   │   └── components/
+│   │   ├── components/          # Reusable UI components
+│   │   └── contexts/            # React contexts
 │   └── vite.config.ts           # PWA config
 ├── docker-compose.yml
 ├── start.bat
@@ -1107,14 +1166,23 @@ astra-agent/
 
 ## Testing
 
-The system includes comprehensive test coverage:
+The system includes comprehensive test coverage with 40+ test files:
 
-| Test Suite | Tests | Coverage |
-|------------|-------|----------|
-| `test_ultra_governance.py` | **68 tests** | Ultra-performance modules + governance upgrade (court, police, army) |
-| `test_mega_upgrade.py` | **55 tests** | All 11 mega modules (message bus, agent protocol, adaptive learner, etc.) |
-| `test_jarvis_upgrade.py` | JARVIS-level modules | Knowledge nexus, predictive intent, mission controller |
-| `test_ultra_performance.py` | Performance modules | Cache, reasoning, decomposition, prefetch |
+| Test Suite | Description |
+|------------|-------------|
+| `test_ultra_governance.py` | Ultra-performance modules + governance upgrade (court, police, army) |
+| `test_mega_upgrade.py` | All mega modules (message bus, agent protocol, adaptive learner, etc.) |
+| `test_jarvis_upgrade.py` | JARVIS-level modules: knowledge nexus, predictive intent, mission controller |
+| `test_ultra_performance.py` | Performance modules: cache, reasoning, decomposition, prefetch |
+| `test_safety.py` | Safety protocols and containment verification |
+| `test_full_pipeline.py` | End-to-end pipeline integration tests |
+| `test_asi_core.py` | ASI core functionality tests |
+| `test_asi_integration.py` | ASI integration tests |
+| `test_providers.py` | LLM provider tests |
+| `test_tutor_improvements.py` | Tutor feature tests |
+| `test_dev_tools.py` | Development tools tests |
+| `test_threat_scanner.py` | Threat scanning tests |
+| `test_threat_destroyer.py` | Threat neutralization tests |
 
 **Run all tests**:
 ```bash
