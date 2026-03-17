@@ -8,9 +8,7 @@
 </p>
 
 <h1 align="center">
-  <img src="assets/logo.png" alt="Astra Agent Logo" width="120" />
-  <br>
-  Astra Agent
+  <img src="assets/logo.png" alt="Astra Agent Logo" width="36" /> Astra Agent
 </h1>
 <h3 align="center">Autonomous ASI System with Self-Evolving Intelligence</h3>
 
