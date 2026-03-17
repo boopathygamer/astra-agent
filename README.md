@@ -7,7 +7,11 @@
   <img src="https://img.shields.io/badge/License-Apache_2.0-orange?style=for-the-badge" />
 </p>
 
-<h1 align="center">🌟 Astra Agent</h1>
+<h1 align="center">
+  <img src="assets/logo.png" alt="Astra Agent Logo" width="120" />
+  <br>
+  Astra Agent
+</h1>
 <h3 align="center">Autonomous ASI System with Self-Evolving Intelligence</h3>
 
 <p align="center">
