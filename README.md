@@ -52,7 +52,9 @@
   - [Auth & Security](#auth--security)
 - [Request Pipeline](#request-pipeline)
 - [Security Architecture](#security-architecture)
-- [Brain Modules (155+)](#brain-modules-155-cognitive-engines)
+- [Expert Reasoning Engine](#-expert-reasoning-engine)
+- [Multi-Channel Gateway (52 Channels)](#-multi-channel-gateway-52-channels)
+- [Brain Modules (160+)](#brain-modules-160-cognitive-engines)
 - [Tools (28 Built-in)](#tools-28-built-in)
 - [Provider Council](#providers-multi-llm-council)
 - [Mega API Endpoints](#mega-api-endpoints)
@@ -80,7 +82,9 @@ Astra Agent is an AI agent system built around an **Artificial Super Intelligenc
 | **JARVIS Cognitive Core** | Knowledge Nexus, Predictive Intent, Mission Controller, Situational Awareness, Hyper Reasoner |
 | **Auto-Scaling Containment** | Security scales proportionally with ASI intelligence upgrades |
 | **Multi-Provider Council** | Consensus-based reasoning across 2–5 LLMs (Claude, Gemini, GPT, Grok, OpenRouter) |
-| **155+ Brain Modules** | Reasoning, memory, evolution, metacognition, adversarial testing, and more |
+| **160+ Brain Modules** | Reasoning, memory, evolution, metacognition, adversarial testing, and more |
+| **Expert Reasoning Engine** | MCTS, Adversarial Debate, Self-Refinement, Neuro-Symbolic, Meta-Cognition, Expert Code Synthesis |
+| **52-Channel Gateway** | WhatsApp, Slack, Discord, Teams, IoT, Kafka, gRPC, and 45+ more communication channels |
 | **28 Built-in Tools** | File I/O, code execution, web search, threat scanning, database ops, DevOps, git, and more |
 | **Agent Infrastructure** | Collaboration teams, plugin hot-loading, background job scheduler |
 | **Auth & RBAC** | JWT tokens, PBKDF2 passwords, role-based access, API key auth |
@@ -148,7 +152,7 @@ graph TB
         Council["LLM Council"]
     end
 
-    subgraph Brain["Brain - 155+ Modules"]
+    subgraph Brain["Brain - 160+ Modules"]
         Memory["Memory Systems"]
         Reasoning["Reasoning Engines"]
         Evolution["Self-Evolution"]
@@ -672,6 +676,66 @@ Beyond the standard brain modules, Astra Agent features a **JARVIS-level cogniti
 
 ---
 
+## 🔬 Expert Reasoning Engine
+
+Six research-grade reasoning modules that surpass single-model approaches by combining multiple reasoning paradigms:
+
+```mermaid
+flowchart TD
+    Q["Complex Problem"] --> Router{"Strategy Selector"}
+    Router -->|Search| MCTS["🌳 MCTS Reasoner"]
+    Router -->|Verify| Debate["⚔️ Adversarial Debate"]
+    Router -->|Improve| Refine["🔄 Self-Refiner"]
+    Router -->|Prove| Neuro["🔗 Neuro-Symbolic"]
+    Router -->|Code| Synth["💻 Code Synthesizer"]
+    
+    MCTS --> MetaCog["🧠 Meta-Cognitive Monitor"]
+    Debate --> MetaCog
+    Refine --> MetaCog
+    Neuro --> MetaCog
+    Synth --> MetaCog
+    MetaCog --> A["Calibrated Answer + Confidence Interval"]
+
+    style A fill:#00c853,stroke:#00e676,color:#fff
+    style MetaCog fill:#2d1b69,stroke:#8b5cf6,color:#fff
+```
+
+| Module | File | Technique | Capabilities |
+|--------|------|-----------|-------------|
+| **MCTS Reasoner** | `brain/mcts_reasoner.py` | Monte Carlo Tree Search | UCT node selection, RAVE fast convergence, progressive widening for infinite action spaces, discounted backpropagation, transposition table |
+| **Self-Refiner** | `brain/self_refiner.py` | Recursive Self-Refinement | 4-perspective critique ensemble (correctness 35%, completeness 25%, clarity 20%, edge cases 20%), EMA convergence detection, semantic diffing |
+| **Debate Engine** | `brain/debate_engine.py` | Adversarial Debate | Proposer/Opponent/Judge roles, structured rounds with escalating difficulty, argument tracking, Nash-style consensus detection |
+| **Meta-Cognitive Monitor** | `brain/metacognitive_monitor.py` | Calibrated Confidence | 10-bin calibration curve, epistemic vs aleatoric uncertainty decomposition, Dunning-Kruger compensation, cognitive load estimation (Miller's Law) |
+| **Code Synthesizer** | `brain/code_synthesizer.py` | Expert Code Analysis | AST-based type inference, loop invariant generation, O(1)→O(n!) complexity analysis, 8 design pattern detectors, property-based test generation, refactoring suggestions |
+| **Neuro-Symbolic** | `brain/neuro_symbolic.py` | Hybrid Logic + Neural | Typed knowledge base, Prolog-style backward chaining with proof trees, forward chaining inference, LLM fact extraction (grounding), neural/symbolic conflict resolution |
+
+**Why this beats single-model reasoning (Claude, GPT, etc.):**
+- Single models get **one chance** to reason. Astra runs **MCTS search trees**, **adversarial debates**, and **iterative refinement**.
+- Single models **don't know what they don't know**. The Meta-Cognitive Monitor **calibrates confidence** against historical accuracy.
+- Single models can't **prove** things. The Neuro-Symbolic engine produces **formal proof trees** via backward chaining.
+
+---
+
+## 🌐 Multi-Channel Gateway (52 Channels)
+
+Unified communication layer supporting 52+ platforms through a single adapter interface.
+
+**Architecture**: `channels/base.py` → `channels/gateway.py` → `channels/adapters/`
+
+| Category | Channels | File |
+|----------|----------|------|
+| **Messaging** (14) | WhatsApp, Telegram, Discord, Slack, Signal, Matrix, IRC, XMPP, WeChat, LINE, Viber, Facebook Messenger, Instagram DM, Twitter DM | `adapters/messaging.py` |
+| **Email** (3) | SMTP/IMAP, Gmail API, Outlook/MS Graph | `adapters/email_adapters.py` |
+| **Voice/Video** (3) | WebRTC, Twilio Voice, SIP | `adapters/voice.py` |
+| **Web** (4) | REST Webhook, WebSocket, SSE, GraphQL | `adapters/web.py` |
+| **Developer Tools** (6) | GitHub, GitLab, Jira, Linear, Notion, Confluence | `adapters/developer.py` |
+| **Business/CRM** (6) | Salesforce, HubSpot, Zendesk, Intercom, Freshdesk, ServiceNow | `adapters/business.py` |
+| **Collaboration** (5) | Microsoft Teams, Google Chat, Zoom Chat, Mattermost, Rocket.Chat | `adapters/collaboration.py` |
+| **IoT/Hardware** (4) | MQTT, HTTP Webhook, gRPC, Serial/COM | `adapters/iot.py` |
+| **Custom/Infra** (7) | Generic Webhook, CLI Pipe, Unix Socket, Named Pipe, Redis, Kafka, RabbitMQ | `adapters/custom.py` |
+
+All adapters share a universal `ChannelMessage` format and register via `ADAPTER_REGISTRY` for dynamic instantiation by the `ChannelGateway`.
+
 ## 🤖 Agent Infrastructure
 
 ### Communication Backbone
@@ -801,13 +865,14 @@ flowchart LR
 
 ---
 
-## Brain Modules (155+ Cognitive Engines)
+## Brain Modules (160+ Cognitive Engines)
 
-The `brain/` directory contains 155+ Python modules organized into subsystems:
+The `brain/` directory contains 160+ Python modules organized into subsystems:
 
 | Category | Key Modules | Purpose |
 |----------|-------------|---------|
 | **Reasoning** | `thinking_loop.py`, `advanced_reasoning.py`, `reasoning.py`, `hypothesis.py`, `metacognition.py`, `hyper_reasoner.py` | Core reasoning loop, chain-of-thought, multi-hop reasoning |
+| **Expert Reasoning** | `mcts_reasoner.py`, `self_refiner.py`, `debate_engine.py`, `metacognitive_monitor.py`, `code_synthesizer.py`, `neuro_symbolic.py` | MCTS search, adversarial debate, recursive refinement, calibrated confidence, expert code analysis, neuro-symbolic proofs |
 | **Memory** | `memory.py`, `long_term_memory.py`, `graph_memory.py`, `vector_store.py`, `semantic_cache.py`, `holographic_memory.py`, `temporal_memory.py`, `semantic_memory.py`, `cryogenic_memory.py` | Short-term, long-term, graph, vector, semantic, and temporal memory systems |
 | **Evolution** | `evolution.py`, `fleet_learning.py`, `prompt_evolver.py`, `reward_model.py`, `cross_pollination.py`, `strategy_evolver.py` | RLHF, swarm optimization, strategy cross-pollination |
 | **ASI Safety** | `containment_grid.py`, `emotional_firewall.py`, `empathy_firewall.py`, `minority_report_police.py`, `karmic_court.py`, `parasitic_sentinel.py`, `immune_system.py`, `realtime_guardian.py` | The 9-tier containment architecture |
@@ -1085,13 +1150,19 @@ astra-agent/
 │   │   ├── proactive/           # Proactive behavior agents
 │   │   ├── skills/              # Agent skill definitions
 │   │   └── earning/             # Revenue generation
-│   ├── brain/                   # 🧬 155+ cognitive modules
+│   ├── brain/                   # 🧬 160+ cognitive modules
 │   │   ├── jarvis_core.py       # 🤖 JARVIS cognitive orchestrator
 │   │   ├── knowledge_nexus.py   # 📚 Multi-source knowledge graph
 │   │   ├── predictive_intent.py # 🔮 Intent prediction engine
 │   │   ├── mission_controller.py# 🎯 Mission orchestration
 │   │   ├── situational_awareness.py # 🌐 Environment modeling
 │   │   ├── hyper_reasoner.py    # 🧠 Advanced multi-hop reasoning
+│   │   ├── mcts_reasoner.py    # 🌳 Monte Carlo Tree Search
+│   │   ├── self_refiner.py     # 🔄 Recursive self-refinement
+│   │   ├── debate_engine.py    # ⚔️ Adversarial debate engine
+│   │   ├── metacognitive_monitor.py # 📊 Calibrated confidence
+│   │   ├── code_synthesizer.py # 💻 Expert code analysis
+│   │   ├── neuro_symbolic.py   # 🔗 Neuro-symbolic reasoning
 │   │   ├── adaptive_learner.py  # 📈 Feedback-driven learning
 │   │   ├── semantic_memory.py   # 🔗 Vector embedding memory
 │   │   ├── workflow_engine.py   # ⚙️ NL→workflow automation
@@ -1107,7 +1178,11 @@ astra-agent/
 │   │   ├── airllm_engine.py     # 70B VRAM swapper
 │   │   ├── environment_observer.py # System environment monitor
 │   │   ├── decision_engine.py   # Multi-criteria decision engine
-│   │   └── ... (135+ more)
+│   │   └── ... (130+ more)
+│   ├── channels/                # 🌐 52-channel gateway
+│   │   ├── base.py              # Abstract adapter + ChannelMessage
+│   │   ├── gateway.py           # Central channel orchestrator
+│   │   └── adapters/            # 52 platform adapters (10 files)
 │   ├── core/                    # ⚡ Ultra-Performance Engine
 │   │   ├── parallel_reasoning.py # Multi-path reasoning
 │   │   ├── cache_hierarchy.py   # L1→L2→L3 intelligent cache
