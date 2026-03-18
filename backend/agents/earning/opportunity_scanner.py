@@ -180,17 +180,17 @@ class FreelancePlatformScanner(SignalSource):
 
             try:
                 opps = json.loads(self._extract_json(answer))
-                    for opp in opps:
-                        signals.append(MarketSignal(
-                            source="freelance_ai_scan",
-                            category=opp.get("platform", "Unknown"),
-                            title=opp.get("title", "Untitled"),
-                            description=opp.get("description", ""),
-                            estimated_value=float(opp.get("estimated_usd", 0)),
-                            raw_data=opp,
-                        ))
-                except (json.JSONDecodeError, TypeError):
-                    logger.debug("[SCANNER] AI scan response not parseable, using fallback")
+                for opp in opps:
+                    signals.append(MarketSignal(
+                        source="freelance_ai_scan",
+                        category=opp.get("platform", "Unknown"),
+                        title=opp.get("title", "Untitled"),
+                        description=opp.get("description", ""),
+                        estimated_value=float(opp.get("estimated_usd", 0)),
+                        raw_data=opp,
+                    ))
+            except (json.JSONDecodeError, TypeError):
+                logger.debug("[SCANNER] AI scan response not parseable, using fallback")
             except Exception as e:
                 logger.debug(f"[SCANNER] Format extraction error: {e}")
         
@@ -257,17 +257,17 @@ class TrendScanner(SignalSource):
                     
             try:
                 trends = json.loads(self._extract_json(answer))
-                    for trend in trends:
-                        signals.append(MarketSignal(
-                            source="trend_scan",
-                            category=trend.get("content_type", "content"),
-                            title=trend.get("topic", "Trending Topic"),
-                            description=trend.get("monetization_angle", ""),
-                            estimated_value=float(trend.get("estimated_monthly_usd", 0)),
-                            raw_data=trend,
-                        ))
-                except (json.JSONDecodeError, TypeError):
-                    pass
+                for trend in trends:
+                    signals.append(MarketSignal(
+                        source="trend_scan",
+                        category=trend.get("content_type", "content"),
+                        title=trend.get("topic", "Trending Topic"),
+                        description=trend.get("monetization_angle", ""),
+                        estimated_value=float(trend.get("estimated_monthly_usd", 0)),
+                        raw_data=trend,
+                    ))
+            except (json.JSONDecodeError, TypeError):
+                pass
             except Exception as e:
                 pass
         
@@ -338,17 +338,17 @@ class ProductGapScanner(SignalSource):
                     
             try:
                 gaps = json.loads(self._extract_json(answer))
-                    for gap in gaps:
-                        signals.append(MarketSignal(
-                            source="product_gap",
-                            category="saas",
-                            title=gap.get("product_idea", "Product Idea"),
-                            description=gap.get("target_market", ""),
-                            estimated_value=float(gap.get("estimated_mrr", 0)),
-                            raw_data=gap,
-                        ))
-                except (json.JSONDecodeError, TypeError):
-                    pass
+                for gap in gaps:
+                    signals.append(MarketSignal(
+                        source="product_gap",
+                        category="saas",
+                        title=gap.get("product_idea", "Product Idea"),
+                        description=gap.get("target_market", ""),
+                        estimated_value=float(gap.get("estimated_mrr", 0)),
+                        raw_data=gap,
+                    ))
+            except (json.JSONDecodeError, TypeError):
+                pass
             except Exception as e:
                 pass
         
