@@ -354,6 +354,39 @@ except ImportError as e:
     logger.error(f"Failed to mount Neural Uplink router: {e}")
 
 # ──────────────────────────────────────────────
+# Health Check
+# ──────────────────────────────────────────────
+
+@app.get("/health")
+async def health_check():
+    """System health check — returns status of all major subsystems."""
+    controller = state.agent_controller
+    subsystems = {}
+
+    if controller:
+        subsystems["agent_controller"] = True
+        subsystems["cce_hybrid"] = {
+            "memory": controller.cce_memory is not None if hasattr(controller, 'cce_memory') else False,
+            "hallucination": controller.cce_hallucination is not None if hasattr(controller, 'cce_hallucination') else False,
+            "learner": controller.cce_learner is not None if hasattr(controller, 'cce_learner') else False,
+            "sandbox": controller.cce_sandbox is not None if hasattr(controller, 'cce_sandbox') else False,
+        }
+        subsystems["complexity_dispatcher"] = controller.complexity_dispatcher is not None if hasattr(controller, 'complexity_dispatcher') else False
+        subsystems["jarvis"] = controller.jarvis_core is not None if hasattr(controller, 'jarvis_core') else False
+        subsystems["mega"] = controller.message_bus is not None if hasattr(controller, 'message_bus') else False
+        subsystems["channels"] = controller.channel_gateway is not None if hasattr(controller, 'channel_gateway') else False
+        subsystems["aesce"] = controller.aesce_engine is not None if hasattr(controller, 'aesce_engine') else False
+    else:
+        subsystems["agent_controller"] = False
+
+    return {
+        "status": "healthy" if controller else "degraded",
+        "version": "5.0.0",
+        "subsystems": subsystems,
+    }
+
+
+# ──────────────────────────────────────────────
 # Provider Configuration Endpoints
 # ──────────────────────────────────────────────
 

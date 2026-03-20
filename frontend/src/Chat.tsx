@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
+  getJarvisStatus, getMegaStatus, type JarvisStatus, type MegaStatus, type HealthStatus,
+} from './api';
+import {
   SquarePen,
   Search,
   GraduationCap,
@@ -46,7 +49,10 @@ import {
   Gamepad2,
   Flame,
   BarChart3,
-  Zap
+  Zap,
+  Satellite,
+  Power,
+  Database
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -54,6 +60,7 @@ import {
   scanFile, scanDirectory, scanUrl, getScanStats, getScanHistory,
   quarantineFile, destroyThreat, getMcpConfig, getMcpStatus, type McpStatus,
   mcpClient, getMcpCapabilities, getMcpMetrics, getMcpHealth,
+  // JARVIS & MEGA are imported at top alongside motion
 } from './api';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -224,18 +231,42 @@ export default function Chat() {
   const [actionStatus, setActionStatus] = useState<Record<string, string>>({});
   const [expandedResult, setExpandedResult] = useState<number | null>(null);
 
-  // ── Health Check ──
+  // ── System Power Dashboard State ──
+  const [showPowerDash, setShowPowerDash] = useState(false);
+  const [systemPower, setSystemPower] = useState<{
+    health: HealthStatus | null;
+    jarvis: JarvisStatus | null;
+    mega: MegaStatus | null;
+    loading: boolean;
+  }>({ health: null, jarvis: null, mega: null, loading: true });
+
+  // ── Health Check + System Power Polling ──
   useEffect(() => {
-    const checkBackend = async () => {
+    const pollAll = async () => {
+      // Health
       try {
-        await checkHealth();
+        const h = await checkHealth();
         setBackendStatus('connected');
+        setSystemPower(prev => ({ ...prev, health: h }));
       } catch {
         setBackendStatus('disconnected');
+        setSystemPower(prev => ({ ...prev, health: null }));
       }
+      // JARVIS
+      try {
+        const j = await getJarvisStatus();
+        setSystemPower(prev => ({ ...prev, jarvis: j }));
+      } catch { setSystemPower(prev => ({ ...prev, jarvis: null })); }
+      // MEGA
+      try {
+        const m = await getMegaStatus();
+        setSystemPower(prev => ({ ...prev, mega: m }));
+      } catch { setSystemPower(prev => ({ ...prev, mega: null })); }
+
+      setSystemPower(prev => ({ ...prev, loading: false }));
     };
-    checkBackend();
-    const interval = setInterval(checkBackend, 30000);
+    pollAll();
+    const interval = setInterval(pollAll, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -616,6 +647,18 @@ export default function Chat() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              id="power-dashboard-toggle"
+              onClick={() => setShowPowerDash(v => !v)}
+              className={`p-2 rounded-lg transition-all duration-200 ${
+                showPowerDash
+                  ? 'bg-emerald-500/15 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+              title="System Power Dashboard"
+            >
+              <Zap className="w-5 h-5" />
+            </button>
             <Link to="/agent" className="p-2 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
               <Bot className="w-5 h-5" />
             </Link>
@@ -627,6 +670,150 @@ export default function Chat() {
             </button>
           </div>
         </header>
+
+        {/* ── System Power Dashboard ── */}
+        <AnimatePresence>
+          {showPowerDash && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              className="overflow-hidden border-b border-white/5"
+            >
+              <div className="power-dashboard">
+                <div className="power-dashboard-header">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-emerald-400" />
+                    <span className="text-sm font-semibold text-white/90">System Power</span>
+                  </div>
+                  <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                    backendStatus === 'connected'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-red-500/10 text-red-400 border-red-500/20'
+                  }`}>
+                    {backendStatus === 'connected' ? '● Online' : '○ Offline'}
+                  </span>
+                </div>
+
+                <div className="power-cards-grid">
+                  {/* Card 1 — Backend Core */}
+                  <div className="power-card" id="power-card-backend">
+                    <div className="power-card-header">
+                      <Power className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Backend Core</span>
+                      <div className={`power-dot ${systemPower.health ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-red-400'}`} />
+                    </div>
+                    <div className="power-card-body">
+                      <div className="power-metric">
+                        <span className="power-metric-label">Model</span>
+                        <span className={`power-metric-value ${systemPower.health?.model_loaded ? 'text-emerald-400' : 'text-white/30'}`}>
+                          {systemPower.health?.model_loaded ? 'Loaded' : '—'}
+                        </span>
+                      </div>
+                      <div className="power-metric">
+                        <span className="power-metric-label">Vision</span>
+                        <span className={`power-metric-value ${systemPower.health?.vision_ready ? 'text-emerald-400' : 'text-white/30'}`}>
+                          {systemPower.health?.vision_ready ? 'Ready' : '—'}
+                        </span>
+                      </div>
+                      <div className="power-metric">
+                        <span className="power-metric-label">Memory</span>
+                        <span className="power-metric-value">{systemPower.health?.memory_entries ?? '—'}</span>
+                      </div>
+                      <div className="power-metric">
+                        <span className="power-metric-label">Tools</span>
+                        <span className="power-metric-value">{systemPower.health?.tools_available ?? '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2 — JARVIS Intelligence */}
+                  <div className="power-card" id="power-card-jarvis">
+                    <div className="power-card-header">
+                      <Satellite className="w-3.5 h-3.5 text-violet-400" />
+                      <span>JARVIS</span>
+                      <div className={`power-dot ${systemPower.jarvis?.status === 'active' || systemPower.jarvis?.status === 'operational' ? 'bg-violet-400 shadow-[0_0_6px_rgba(167,139,250,0.6)]' : 'bg-white/20'}`} />
+                    </div>
+                    <div className="power-card-body">
+                      <div className="power-metric">
+                        <span className="power-metric-label">Status</span>
+                        <span className={`power-metric-value ${systemPower.jarvis ? 'text-violet-400' : 'text-white/30'}`}>
+                          {systemPower.jarvis?.status ?? '—'}
+                        </span>
+                      </div>
+                      <div className="power-metric">
+                        <span className="power-metric-label">Version</span>
+                        <span className="power-metric-value">{systemPower.jarvis?.version ?? '—'}</span>
+                      </div>
+                      <div className="power-metric">
+                        <span className="power-metric-label">Interactions</span>
+                        <span className="power-metric-value">{systemPower.jarvis?.interactions ?? '—'}</span>
+                      </div>
+                      <div className="power-metric">
+                        <span className="power-metric-label">Uptime</span>
+                        <span className="power-metric-value">
+                          {systemPower.jarvis?.uptime_seconds != null
+                            ? `${Math.floor(systemPower.jarvis.uptime_seconds / 60)}m`
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 3 — MEGA Subsystems */}
+                  <div className="power-card power-card-wide" id="power-card-mega">
+                    <div className="power-card-header">
+                      <Database className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>MEGA Subsystems</span>
+                      <div className={`power-dot ${systemPower.mega ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.6)]' : 'bg-white/20'}`} />
+                    </div>
+                    <div className="power-card-body power-gauges">
+                      {[
+                        ['Bus', systemPower.mega?.message_bus],
+                        ['Memory', systemPower.mega?.semantic_memory],
+                        ['Learner', systemPower.mega?.adaptive_learner],
+                        ['Plugins', systemPower.mega?.plugin_manager],
+                        ['Workflow', systemPower.mega?.workflow_engine],
+                        ['Projects', systemPower.mega?.project_intelligence],
+                        ['Scheduler', systemPower.mega?.scheduler],
+                        ['Collab', systemPower.mega?.collaboration],
+                      ].map(([label, active]) => (
+                        <div key={label as string} className="power-gauge">
+                          <div className={`power-gauge-dot ${active ? 'bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]' : 'bg-white/10'}`} />
+                          <span className={`power-gauge-label ${active ? 'text-white/70' : 'text-white/25'}`}>{label as string}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Card 4 — Dispatcher */}
+                  <div className="power-card" id="power-card-dispatcher">
+                    <div className="power-card-header">
+                      <Activity className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Dispatcher</span>
+                      <div className={`power-dot ${backendStatus === 'connected' ? 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]' : 'bg-white/20'}`} />
+                    </div>
+                    <div className="power-card-body">
+                      <div className="power-metric">
+                        <span className="power-metric-label">Engine</span>
+                        <span className={`power-metric-value ${backendStatus === 'connected' ? 'text-amber-400' : 'text-white/30'}`}>
+                          {backendStatus === 'connected' ? 'CCE Hybrid' : '—'}
+                        </span>
+                      </div>
+                      <div className="power-metric">
+                        <span className="power-metric-label">Complexity</span>
+                        <span className={`power-metric-value ${backendStatus === 'connected' ? 'text-amber-400' : 'text-white/30'}`}>
+                          {backendStatus === 'connected' ? 'Active' : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">

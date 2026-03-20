@@ -730,3 +730,125 @@
     0 0 30px rgba(16, 185, 129, 0.06),
     inset 0 1px 0 rgba(16, 185, 129, 0.08);
 }
+
+/* ═══════════════════════════════════════════════════
+   System Power Dashboard
+   ═══════════════════════════════════════════════════ */
+
+.power-dashboard {
+  padding: 16px 20px 20px;
+  background: linear-gradient(180deg, rgba(10, 10, 10, 0.95) 0%, rgba(15, 15, 15, 0.9) 100%);
+}
+
+.power-dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.power-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.power-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+
+.power-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.power-card-wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 640px) {
+  .power-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .power-card-wide {
+    grid-column: span 1;
+  }
+}
+
+.power-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.power-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.power-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.power-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.power-metric-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 500;
+}
+
+.power-metric-value {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* MEGA gauge grid */
+.power-gauges {
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  gap: 8px 14px !important;
+}
+
+.power-gauge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.power-gauge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.power-gauge-label {
+  font-size: 11px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+}

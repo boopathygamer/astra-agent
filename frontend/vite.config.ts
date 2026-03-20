@@ -97,6 +97,8 @@ export default defineConfig(({ mode }) => {
         '/mcp': 'http://localhost:8000',
         '/docs': 'http://localhost:8000',
         '/asi': 'http://localhost:8000',
+        '/jarvis': 'http://localhost:8000',
+        '/mega': 'http://localhost:8000',
         '/dev': 'http://localhost:8000',
         '/airllm': 'http://localhost:8000',
         '/ws': {
