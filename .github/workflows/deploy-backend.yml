@@ -54,12 +54,12 @@ jobs:
     needs: build-and-push
 
     steps:
-      - name: Deploy to Droplet
+      - name: Deploy to Azure VM
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USERNAME }}
-          key: ${{ secrets.DO_SSH_KEY }}
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USERNAME }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
             cd ~/astra-agent
 
