@@ -244,23 +244,26 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error(f"⚠️ Failed to create AgentController with registry: {e}")
         else:
-            logger.warning("⚠️ No active LLM Provider found. Using Mock Generator for UI Testing.")
-            def mock_generate(prompt: str, **kwargs) -> str:
-                import time
-                time.sleep(0.5)
-                if "TaskSpec" in prompt or "extract" in prompt.lower() or "JSON" in prompt:
-                    return '{"action_type": "general", "tools_needed": [], "goal": "Demonstrate the UI", "requires_sandbox": false}'
-                if "Reasoning chain" in prompt or "hypothesis" in prompt.lower():
-                    return "Hypothesis: By mocking the generator, we can validate the React UI logic."
-                if "Verify" in prompt or "verification" in prompt.lower():
-                    return '{"passed": true, "confidence": 0.95, "v_static": 1.0, "v_property": 1.0, "v_scenario": 1.0, "v_critic": 1.0, "v_code": 1.0, "v_security": 1.0, "critic_details": "Looks good."}'
-                return "This is a simulated response. Processing complete! Fibonacci: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34."
-            
+            logger.warning("⚠️ No active LLM Provider found. Activating Cognitive Core Engine (GPU-free).")
             try:
-                state.agent_controller = AgentController(generate_fn=mock_generate)
-                logger.info("✅ Agent controller ready (Mock Provider)")
+                from brain.cognitive_core import CognitiveCoreEngine
+                cce = CognitiveCoreEngine(auto_index=True)
+                state.agent_controller = AgentController(generate_fn=cce.generate)
+                state.cognitive_core = cce
+                logger.info("🧠 Agent controller ready (Cognitive Core Engine — GPU-free, LLM-free)")
             except Exception as e:
-                logger.error(f"⚠️ Failed to create AgentController with mock: {e}")
+                logger.warning(f"⚠️ CCE init failed, falling back to mock: {e}")
+                def mock_generate(prompt: str, **kwargs) -> str:
+                    import time
+                    time.sleep(0.1)
+                    if "TaskSpec" in prompt or "extract" in prompt.lower() or "JSON" in prompt:
+                        return '{"action_type": "general", "tools_needed": [], "goal": "Demonstrate the UI", "requires_sandbox": false}'
+                    return "System running in minimal fallback mode."
+                try:
+                    state.agent_controller = AgentController(generate_fn=mock_generate)
+                    logger.info("✅ Agent controller ready (Minimal Fallback)")
+                except Exception as e2:
+                    logger.error(f"⚠️ Failed to create AgentController: {e2}")
 
         state.is_ready = True
         logger.info("=" * 60)
@@ -314,7 +317,7 @@ app = FastAPI(
         "Features: multimodal image analysis, self-improving from mistakes, "
         "multi-hypothesis reasoning, and professional agent assistants."
     ),
-    version="2.0.0",
+    version="5.0.0",
     lifespan=lifespan,
     docs_url="/docs" if not _API_KEY else None,  # Hide docs in production
     redoc_url=None,
@@ -384,16 +387,40 @@ async def configure_providers(request: dict):
         "openrouter_model": "openrouter_model",
     }
 
+    _MAX_KEY_LEN = 256
+    _ALLOWED_KEYS = set(key_map.keys()) | set(model_map.keys())
+
+    # Reject unknown keys to prevent setattr abuse
+    unknown = set(request.keys()) - _ALLOWED_KEYS
+    if unknown:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Unknown keys: {', '.join(sorted(unknown))}"},
+        )
+
     updated = []
     for req_key, config_attr in key_map.items():
-        value = request.get(req_key, "").strip()
+        value = request.get(req_key, "")
+        if not isinstance(value, str):
+            return JSONResponse(status_code=400, content={"error": f"{req_key} must be a string"})
+        value = value.strip()
+        if len(value) > _MAX_KEY_LEN:
+            return JSONResponse(status_code=400, content={"error": f"{req_key} exceeds {_MAX_KEY_LEN} characters"})
         if value:
+            # Strip non-printable / control characters
+            value = ''.join(c for c in value if c.isprintable())
             setattr(provider_config, config_attr, value)
             updated.append(req_key.replace("_api_key", ""))
     # Apply model overrides
     for req_key, config_attr in model_map.items():
-        value = request.get(req_key, "").strip()
+        value = request.get(req_key, "")
+        if not isinstance(value, str):
+            return JSONResponse(status_code=400, content={"error": f"{req_key} must be a string"})
+        value = value.strip()
+        if len(value) > _MAX_KEY_LEN:
+            return JSONResponse(status_code=400, content={"error": f"{req_key} exceeds {_MAX_KEY_LEN} characters"})
         if value:
+            value = ''.join(c for c in value if c.isprintable())
             setattr(provider_config, config_attr, value)
 
     if not updated:
@@ -738,6 +765,105 @@ async def list_failures():
         "count": len(failures),
         "failures": [asdict(f) for f in failures[-20:]],  # Last 20
     }
+
+
+# ──────────────────────────────────────────────
+# System Observability Endpoints (auth required)
+# ──────────────────────────────────────────────
+
+@app.get("/system/telemetry", dependencies=[Depends(verify_api_key)])
+async def system_telemetry():
+    """Get a full telemetry dashboard snapshot."""
+    if not state.agent_controller:
+        raise HTTPException(503, "Agent not initialized")
+
+    dashboard = getattr(state.agent_controller, "telemetry_dashboard", None)
+    if dashboard is None:
+        return {"status": "unavailable", "message": "Telemetry dashboard not initialized"}
+
+    try:
+        snapshot = dashboard.get_snapshot()
+        return {"status": "ok", "snapshot": snapshot}
+    except Exception as e:
+        logger.error(f"Telemetry snapshot error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/system/circuit-breakers", dependencies=[Depends(verify_api_key)])
+async def system_circuit_breakers():
+    """Get status of all circuit breakers."""
+    try:
+        from core.circuit_breaker import get_all_breakers
+        breakers = get_all_breakers()
+        # Also include the controller's LLM breaker if available
+        ctrl_cb = getattr(state.agent_controller, "llm_circuit_breaker", None)
+        if ctrl_cb and ctrl_cb.name not in breakers:
+            breakers[ctrl_cb.name] = ctrl_cb.get_status()
+        return {"status": "ok", "circuit_breakers": breakers}
+    except Exception as e:
+        logger.error(f"Circuit breaker status error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/system/circuit-breakers/{name}/reset", dependencies=[Depends(verify_api_key)])
+async def reset_circuit_breaker(name: str):
+    """Manually reset a tripped circuit breaker."""
+    try:
+        from core.circuit_breaker import get_all_breakers
+        breakers = get_all_breakers()
+
+        # Also check controller's LLM breaker
+        ctrl_cb = getattr(state.agent_controller, "llm_circuit_breaker", None)
+        if ctrl_cb and ctrl_cb.name == name:
+            ctrl_cb.reset()
+            return {"status": "ok", "message": f"Circuit breaker '{name}' reset", "new_state": ctrl_cb.state.value}
+
+        if name not in breakers:
+            raise HTTPException(404, f"Circuit breaker '{name}' not found")
+
+        # Access the breaker through the internal dict
+        from core.circuit_breaker import _breakers
+        cb = _breakers.get(name)
+        if cb:
+            cb.reset()
+            return {"status": "ok", "message": f"Circuit breaker '{name}' reset", "new_state": cb.state.value}
+
+        raise HTTPException(404, f"Circuit breaker '{name}' not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Circuit breaker reset error: {e}")
+        raise HTTPException(500, f"Reset failed: {str(e)}")
+
+
+@app.get("/system/cognitive-core", dependencies=[Depends(verify_api_key)])
+async def cognitive_core_status():
+    """Get Cognitive Core Engine status & statistics."""
+    cce = getattr(state, "cognitive_core", None)
+    if cce is None:
+        return {"status": "inactive", "message": "CCE not initialized (LLM provider is active)"}
+
+    try:
+        return {"status": "active", "stats": cce.get_stats()}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/system/cognitive-core/train", dependencies=[Depends(verify_api_key)])
+async def cognitive_core_train(request: dict):
+    """Add knowledge to the CCE at runtime. Body: {"content": "...", "source": "..."}"""
+    cce = getattr(state, "cognitive_core", None)
+    if cce is None:
+        raise HTTPException(503, "CCE not active")
+
+    content = request.get("content", "")
+    source = request.get("source", "api")
+
+    if not content:
+        raise HTTPException(400, "Missing 'content' field")
+
+    cce.add_knowledge(content, source)
+    return {"status": "ok", "message": f"Knowledge added ({len(content)} chars)", "total_passages": cce.retriever._index.size}
 
 
 # ──────────────────────────────────────────────

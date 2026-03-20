@@ -140,6 +140,10 @@ class ThinkingLoop:
         expert_reflection: Optional[ExpertReflectionEngine] = None,
         tool_forge=None,
         config=None,
+        # ── Expert Reasoning Modules ──
+        mcts_reasoner=None,
+        debate_engine=None,
+        neuro_symbolic=None,
     ):
         self.generate_fn = generate_fn
         self.config = config or brain_config
@@ -178,6 +182,11 @@ class ThinkingLoop:
         self.tool_forge = tool_forge
         self._auto_forge_attempts: int = 0
         self._auto_forge_stats = {"attempts": 0, "successes": 0, "failures": 0}
+
+        # Expert Reasoning Modules (optional)
+        self.mcts_reasoner = mcts_reasoner
+        self.debate_engine = debate_engine
+        self.neuro_symbolic = neuro_symbolic
 
         # Learning counters
         self._success_count: int = 0
@@ -293,6 +302,12 @@ class ThinkingLoop:
             generate_fn=self.generate_fn,
             context=enriched_context,
         )
+
+        # ── EXPERT REASONING AUGMENTATION ──
+        # Route to the best expert engine based on domain
+        expert_insight = self._run_domain_expert(domain, problem, enriched_context)
+        if expert_insight:
+            enriched_context += f"\n\n[EXPERT REASONING]\n{expert_insight}\n"
 
         # Emit hypothesis span
         trajectory.add_span(emit_span(
@@ -692,6 +707,74 @@ class ThinkingLoop:
                 last_node = "Fail"
                 
         return "\n".join(lines)
+
+    # ── Expert Reasoning by Domain ──────────────────
+
+    # Maps ProblemDomain values → which expert engine to invoke
+    _DOMAIN_EXPERT_MAP = {
+        "code":     "mcts",
+        "build":    "mcts",
+        "planning": "mcts",
+        "debug":    "mcts",
+        "analysis": "debate",
+        "creative": "debate",
+        "debate":   "debate",
+        "math":     "neuro_symbolic",
+        "logic":    "neuro_symbolic",
+        "science":  "neuro_symbolic",
+    }
+
+    def _run_domain_expert(
+        self,
+        domain: ProblemDomain,
+        problem: str,
+        context: str,
+    ) -> str:
+        """Select and run an expert reasoning engine based on domain.
+
+        Returns a condensed insight string (or empty if unavailable).
+        """
+        engine_key = self._DOMAIN_EXPERT_MAP.get(domain.value, "")
+
+        try:
+            if engine_key == "mcts" and self.mcts_reasoner:
+                result = self.mcts_reasoner.search(problem[:500], context=context[:300])
+                if result.best_action:
+                    trace_summary = " → ".join(result.reasoning_trace[:3])
+                    return (
+                        f"[MCTS Search] Best path (q={result.best_value:.3f}, "
+                        f"conf={result.confidence:.3f}, depth={result.max_depth_reached}): "
+                        f"{result.best_action[:300]}\n"
+                        f"Trace: {trace_summary}"
+                    )
+
+            elif engine_key == "debate" and self.debate_engine:
+                result = self.debate_engine.debate(problem[:500], context=context[:300])
+                if result.final_conclusion:
+                    return (
+                        f"[Adversarial Debate] Verdict={result.verdict.value} "
+                        f"(conf={result.confidence:.3f}, rounds={len(result.rounds)}):\n"
+                        f"{result.final_conclusion[:400]}"
+                    )
+
+            elif engine_key == "neuro_symbolic" and self.neuro_symbolic:
+                result = self.neuro_symbolic.reason(problem[:500], context=context[:300])
+                if result.natural_language:
+                    proof_summary = ""
+                    if result.proof:
+                        proof_summary = f"\nProof: {result.proof.to_text()[:300]}"
+                    return (
+                        f"[Neuro-Symbolic] "
+                        f"{'PROVEN' if result.is_satisfiable else 'UNRESOLVED'} "
+                        f"(conf={result.confidence:.3f}):\n"
+                        f"{result.natural_language[:400]}{proof_summary}"
+                    )
+
+        except Exception as e:
+            logger.debug(f"[EXPERT] Domain expert ({engine_key}) error: {e}")
+
+        return ""
+
 
     def _post_solve_learning(
         self,

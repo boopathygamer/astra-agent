@@ -90,7 +90,7 @@ def show_banner(registry=None):
     print(f"""
     ╔══════════════════════════════════════════════════════════════╗
     ║                                                              ║
-    ║   🧠  Universal AI Agent  v2.0                               ║
+    ║   🧠  Universal AI Agent  v5.0                               ║
     ║   ──────────────────────────                                 ║
     ║   Multi-Model • Multi-Domain • Multi-Persona                 ║
     ║                                                              ║
@@ -124,18 +124,13 @@ def start_server(provider: str = "auto", api_key: str = None, base_url: str = No
         logger.warning(f"Failed to boot Army Agent Defense Matrix: {e}")
         
     # --- ASI TIER 2: IMMUNE SYSTEM DEFENSE ---
+    # Store immune system config for server.py lifespan to pick up
     try:
         from brain.immune_system import ImmuneSystem
-        logger.info("🛡️ Engaging ASI Zero-Day Immune System Daemon...")
-        
-        # We hook into the ASGI event loop dynamically
-        @app.on_event("startup")
-        async def startup_immune_system():
-            immune = ImmuneSystem(generate_fn=registry.generate_fn())
-            import asyncio
-            asyncio.create_task(immune.run_defense_loop())
+        _app_state["immune_generate_fn"] = registry.generate_fn()
+        logger.info("🛡️ ASI Immune System staged for server lifespan startup.")
     except Exception as e:
-        logger.warning(f"Failed to engage ASI Immune System: {e}")
+        logger.warning(f"Failed to stage ASI Immune System: {e}")
 
     uvicorn_kwargs = {
         "host": api_config.host,

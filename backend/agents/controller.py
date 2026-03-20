@@ -105,6 +105,33 @@ from agents.plugins import PluginManager
 from agents.scheduler import AgentScheduler, JobFrequency
 from core.local_model_provider import LocalModelProvider, GenerationMode
 
+# ── Expert Reasoning Engine ──
+from brain.mcts_reasoner import MCTSReasoner
+from brain.self_refiner import SelfRefiner
+from brain.debate_engine import DebateEngine
+from brain.metacognitive_monitor import MetaCognitiveMonitor
+from brain.code_synthesizer import CodeSynthesizer
+from brain.neuro_symbolic import NeuroSymbolicReasoner
+
+# ── System Hardening ──
+from core.circuit_breaker import CircuitBreaker, get_all_breakers, CircuitOpenError
+from telemetry.dashboard import TelemetryDashboard
+
+# ── CCE v5.0 Hybrid Layer ──
+from brain.infinite_memory_engine import InfiniteMemoryEngine
+from brain.hallucination_destroyer import HallucinationDestroyer
+from brain.realtime_learning_engine import RealtimeLearningEngine
+from brain.code_execution_sandbox import CodeExecutionSandbox
+from brain.complexity_dispatcher import ComplexityDispatcher
+
+# ── Multi-Channel Gateway ──
+try:
+    from channels.gateway import ChannelGateway
+    from channels.adapters import ADAPTER_REGISTRY
+except ImportError:
+    ChannelGateway = None
+    ADAPTER_REGISTRY = {}
+
 logger = logging.getLogger(__name__)
 
 
@@ -166,11 +193,9 @@ class AgentController:
             tool_registry=self.tools,
         )
 
-        self.thinking_loop = ThinkingLoop(
-            generate_fn=generate_fn,
-            memory=self.memory,
-            tool_forge=self.tool_forge,
-        )
+        # ThinkingLoop is created later after circuit breaker is initialized
+        self._raw_generate_fn = generate_fn
+        self.thinking_loop = None  # placeholder — built after circuit breaker init
 
         # ── EXPERT TELEMETRY: Trace Spans & Metrics ──
         self.tracer = SpanTracer()
@@ -386,15 +411,233 @@ class AgentController:
             self.resource_manager = None
             self.hot_path_optimizer = None
 
+        # ── Expert Reasoning Engine ──
+        try:
+            self.mcts_reasoner = MCTSReasoner(
+                generate_fn=generate_fn,
+                max_simulations=50,
+                max_depth=6,
+            )
+            self.self_refiner = SelfRefiner(
+                generate_fn=generate_fn,
+                max_passes=4,
+                target_score=0.90,
+            )
+            self.debate_engine = DebateEngine(
+                generate_fn=generate_fn,
+                max_rounds=3,
+            )
+            self.metacognitive_monitor = MetaCognitiveMonitor()
+            self.code_synthesizer = CodeSynthesizer(generate_fn=generate_fn)
+            self.neuro_symbolic = NeuroSymbolicReasoner(generate_fn=generate_fn)
+
+            logger.info(
+                "[EXPERT] All 6 expert reasoning modules initialized: "
+                "MCTS, SelfRefiner, DebateEngine, MetaCogMonitor, "
+                "CodeSynthesizer, NeuroSymbolic"
+            )
+        except Exception as e:
+            logger.warning(f"[EXPERT] Expert reasoning init failed (non-fatal): {e}")
+            self.mcts_reasoner = None
+            self.self_refiner = None
+            self.debate_engine = None
+            self.metacognitive_monitor = None
+            self.code_synthesizer = None
+            self.neuro_symbolic = None
+
+        # ── System Hardening: Circuit Breaker + Telemetry Dashboard ──
+        try:
+            self.llm_circuit_breaker = CircuitBreaker(
+                name="llm_provider",
+                failure_threshold=5,
+                recovery_timeout=30.0,
+            )
+            self.telemetry_dashboard = TelemetryDashboard()
+
+            # Register all subsystem metrics sources with the dashboard
+            if self.telemetry_dashboard:
+                self.telemetry_dashboard.register_source(
+                    "circuit_breaker",
+                    lambda: self.llm_circuit_breaker.get_metrics(),
+                )
+                if self.mcts_reasoner:
+                    self.telemetry_dashboard.register_source(
+                        "mcts_reasoner",
+                        lambda: self.mcts_reasoner.get_stats(),
+                    )
+                if self.self_refiner:
+                    self.telemetry_dashboard.register_source(
+                        "self_refiner",
+                        lambda: self.self_refiner.get_stats(),
+                    )
+                if self.debate_engine:
+                    self.telemetry_dashboard.register_source(
+                        "debate_engine",
+                        lambda: self.debate_engine.get_stats(),
+                    )
+                if self.metacognitive_monitor:
+                    self.telemetry_dashboard.register_source(
+                        "metacognitive",
+                        lambda: self.metacognitive_monitor.get_stats(),
+                    )
+                if self.neuro_symbolic:
+                    self.telemetry_dashboard.register_source(
+                        "neuro_symbolic",
+                        lambda: self.neuro_symbolic.get_stats(),
+                    )
+
+            logger.info("[HARDENING] Circuit breaker + Telemetry dashboard initialized")
+        except Exception as e:
+            logger.warning(f"[HARDENING] System hardening init failed (non-fatal): {e}")
+            self.llm_circuit_breaker = None
+            self.telemetry_dashboard = None
+
+        # ── CCE v5.0 Hybrid Layer ──
+        # These engines run alongside the LLM to enhance every response.
+        try:
+            self.cce_memory = InfiniteMemoryEngine()
+            self.cce_hallucination = HallucinationDestroyer()
+            self.cce_learner = RealtimeLearningEngine()
+            self.cce_sandbox = CodeExecutionSandbox()
+
+            # Register with telemetry dashboard for observability
+            if self.telemetry_dashboard:
+                self.telemetry_dashboard.register_source(
+                    "cce_memory", lambda: self.cce_memory.get_stats(),
+                )
+                self.telemetry_dashboard.register_source(
+                    "cce_hallucination", lambda: self.cce_hallucination.get_stats(),
+                )
+                self.telemetry_dashboard.register_source(
+                    "cce_learner", lambda: self.cce_learner.get_stats(),
+                )
+                self.telemetry_dashboard.register_source(
+                    "cce_sandbox", lambda: self.cce_sandbox.get_stats(),
+                )
+
+            logger.info(
+                "[CCE HYBRID] 4 v5.0 engines online: "
+                "InfiniteMemory, HallucinationDestroyer, RealtimeLearner, CodeSandbox"
+            )
+        except Exception as e:
+            logger.warning(f"[CCE HYBRID] Init failed (non-fatal): {e}")
+            self.cce_memory = None
+            self.cce_hallucination = None
+            self.cce_learner = None
+            self.cce_sandbox = None
+
+        # ── Complexity Dispatcher — Multi-Agent Problem Solver ──
+        try:
+            from agents.experts.router import DOMAIN_KEYWORDS
+            self.complexity_dispatcher = ComplexityDispatcher(
+                generate_fn=self._raw_generate_fn,
+                domain_experts=DOMAIN_EXPERTS,
+                agent_forge=getattr(self, 'agent_forge', None),
+                domain_keywords=DOMAIN_KEYWORDS,
+            )
+            logger.info("[DISPATCHER] Complexity Dispatcher initialized — multi-agent decomposition ONLINE")
+        except Exception as e:
+            logger.warning(f"[DISPATCHER] Init failed (non-fatal): {e}")
+            self.complexity_dispatcher = None
+
+        # ── Build protected generate_fn and ThinkingLoop ──
+        self.generate_fn = self._build_protected_generate(self._raw_generate_fn)
+        self.thinking_loop = ThinkingLoop(
+            generate_fn=self.generate_fn,
+            memory=self.memory,
+            tool_forge=self.tool_forge,
+            mcts_reasoner=self.mcts_reasoner,
+            debate_engine=self.debate_engine,
+            neuro_symbolic=self.neuro_symbolic,
+        )
+
+        # ── Multi-Channel Gateway ──
+        try:
+            if ChannelGateway is not None and self.message_bus:
+                self.channel_gateway = ChannelGateway(
+                    message_bus=self.message_bus,
+                    agent_fn=lambda msg: self.process(msg).answer,
+                )
+                logger.info(
+                    f"[CHANNELS] Multi-channel gateway initialized — "
+                    f"{len(ADAPTER_REGISTRY)} adapters available"
+                )
+            else:
+                self.channel_gateway = None
+        except Exception as e:
+            logger.warning(f"[CHANNELS] Gateway init failed (non-fatal): {e}")
+            self.channel_gateway = None
+
+        # ── AESCE Dream-State Engine ──
+        try:
+            from brain.aesce import SynthesizedConsciousnessEngine
+            self.aesce_engine = SynthesizedConsciousnessEngine(
+                memory_manager=self.memory,
+                generate_fn=self.generate_fn,
+            )
+            # Schedule dream cycle every 30 minutes
+            if self.scheduler:
+                self.scheduler.register(
+                    "aesce_dream_cycle",
+                    lambda: self.aesce_engine.trigger_dream_state(),
+                    frequency=JobFrequency.MINUTES,
+                    interval=30,
+                    priority=3,
+                )
+            logger.info("[AESCE] Dream-state engine initialized and scheduled")
+        except Exception as e:
+            logger.warning(f"[AESCE] Dream-state init failed (non-fatal): {e}")
+            self.aesce_engine = None
+
         logger.info(
             f"Universal Agent Controller initialized — "
             f"agent_id='{agent_id}', profile='{profile.value}', "
             f"session='{self._main_session.session_id}', "
             f"skills={len(self.skills.list_skills())}, "
-            f"domains=10, personas=5, reasoning_strategies=4, "
+            f"domains=10, personas=5, reasoning_strategies=10, "
             f"safety=ENABLED, jarvis={'ONLINE' if self.jarvis_core else 'OFFLINE'}, "
-            f"mega_upgrade={'ONLINE' if self.message_bus else 'OFFLINE'}"
+            f"mega_upgrade={'ONLINE' if self.message_bus else 'OFFLINE'}, "
+            f"expert_reasoning={'ONLINE' if self.mcts_reasoner else 'OFFLINE'}, "
+            f"channels={'ONLINE' if self.channel_gateway else 'OFFLINE'}, "
+            f"aesce={'ONLINE' if self.aesce_engine else 'OFFLINE'}, "
+            f"cce_hybrid={'ONLINE' if self.cce_memory else 'OFFLINE'}"
         )
+
+    def _build_protected_generate(self, raw_fn: Callable) -> Callable:
+        """Wrap generate_fn with circuit breaker fault tolerance.
+
+        When the circuit is CLOSED (normal), calls pass through with
+        success/failure tracking.  When OPEN (too many failures), a
+        graceful fallback message is returned immediately instead of
+        hammering the LLM provider.
+        """
+        cb = self.llm_circuit_breaker
+
+        def protected_generate(prompt: str, **kwargs) -> str:
+            if cb is None:
+                # Circuit breaker not available — pass through
+                return raw_fn(prompt, **kwargs)
+
+            if not cb.allow_request():
+                logger.warning(
+                    "[CIRCUIT] LLM circuit OPEN — returning fallback response"
+                )
+                self.metrics.counter("agent.circuit_breaker.rejected")
+                return (
+                    "I'm temporarily experiencing connectivity issues with my "
+                    "reasoning backend. Please try again in a moment."
+                )
+
+            try:
+                result = raw_fn(prompt, **kwargs)
+                cb.record_success()
+                return result
+            except Exception as e:
+                cb.record_failure(str(e))
+                logger.error(f"[CIRCUIT] LLM call failed: {e}")
+                raise
+
+        return protected_generate
 
     def process(
         self,
@@ -453,6 +696,19 @@ class AgentController:
                 best_strategy = self.adaptive_learner.get_best_strategy()
                 if best_strategy != "default":
                     mega_context += f"\n[PREFERRED STRATEGY: {best_strategy}]\n"
+
+            # 5. CCE Hybrid: Recall cross-session memories via Infinite Memory
+            if self.cce_memory:
+                recall_result = self.cce_memory.recall(user_input)
+                if recall_result.found and recall_result.traces:
+                    mem_snippets = []
+                    for trace in recall_result.traces[:3]:  # Top 3 memories
+                        mem_snippets.append(f"- {trace.key}: {trace.content[:150]}")
+                    if mem_snippets:
+                        mega_context += (
+                            f"\n[CCE INFINITE MEMORY — Cross-Session Recall]\n"
+                            + "\n".join(mem_snippets) + "\n"
+                        )
 
         except Exception as e:
             logger.debug(f"[MEGA] Pre-processing error (non-fatal): {e}")
@@ -566,6 +822,69 @@ class AgentController:
                 metadata={"mode": "omni_solver", "confidence": 1.0},
             )
             return response
+        
+        # ── COMPLEXITY DISPATCHER INTERCEPTION ──
+        # If the problem is complex enough, decompose and dispatch to multiple agents
+        try:
+            if self.complexity_dispatcher:
+                complexity = self.complexity_dispatcher.assess(user_input)
+                if complexity.should_decompose:
+                    logger.info(
+                        f"[DISPATCHER] Complex problem detected "
+                        f"(score={complexity.score:.2f}, "
+                        f"domains={complexity.detected_domains}). "
+                        f"Activating multi-agent decomposition."
+                    )
+                    if event_callback:
+                        event_callback({
+                            "type": "execution_step",
+                            "step": 2,
+                            "phase": "routing",
+                            "agent": self.agent_id,
+                            "action": (
+                                f"Complex problem detected (score={complexity.score:.2f}). "
+                                f"Decomposing across {len(complexity.detected_domains)} domains: "
+                                f"{', '.join(complexity.detected_domains)}..."
+                            ),
+                            "duration": 0,
+                            "status": "running",
+                        })
+
+                    dispatch_result = self.complexity_dispatcher.solve(user_input)
+
+                    if dispatch_result.success:
+                        response.answer = dispatch_result.synthesized_answer
+                        response.confidence = 0.9
+                        response.mode = "multi_agent_dispatch"
+                        response.duration_ms = dispatch_result.total_duration_ms
+
+                        if event_callback:
+                            event_callback({
+                                "type": "execution_step",
+                                "step": 2,
+                                "phase": "complete",
+                                "agent": self.agent_id,
+                                "action": (
+                                    f"Multi-agent dispatch complete: "
+                                    f"{len(dispatch_result.sub_tasks)} sub-tasks, "
+                                    f"{len(dispatch_result.agents_used)} agents used"
+                                ),
+                                "duration": round(dispatch_result.total_duration_ms),
+                                "status": "done",
+                            })
+
+                        self.session_manager.add_message(
+                            active_session, "assistant", response.answer,
+                            metadata={
+                                "mode": "multi_agent_dispatch",
+                                "confidence": 0.9,
+                                "agents_used": dispatch_result.agents_used,
+                                "sub_tasks": len(dispatch_result.sub_tasks),
+                            },
+                        )
+                        return response
+        except Exception as e:
+            logger.debug(f"[DISPATCHER] Complexity dispatch error (non-fatal): {e}")
         
         # FEATURE 1: Dynamic Domain Generation
         # If confidence is 0.0 (no match), generate a dynamic expert context on the fly
@@ -708,7 +1027,64 @@ class AgentController:
                 response.confidence = 0.8
                 response.iterations = 1
                 response.mode = "direct"
-                
+
+            # ── EXPERT POST-PROCESSING: Self-Refine + Meta-Cognitive Calibration ──
+            try:
+                # Self-refine the answer for complex tasks
+                if (
+                    self.self_refiner
+                    and task_spec.action_type in ("code", "debug", "analysis", "build")
+                    and response.confidence < 0.85
+                ):
+                    refine_result = self.self_refiner.refine(
+                        problem=user_input,
+                        initial_response=response.answer,
+                    )
+                    if refine_result.final_score > response.confidence:
+                        response.answer = refine_result.final_output
+                        response.confidence = refine_result.final_score
+                        response.mode = f"{response.mode}+refined"
+                        logger.info(
+                            f"[EXPERT] Self-refinement improved confidence: "
+                            f"{thinking_result.final_confidence if use_thinking_loop else 0.8:.3f}"
+                            f" → {refine_result.final_score:.3f}"
+                        )
+
+                # Code analysis for code-related tasks
+                if (
+                    self.code_synthesizer
+                    and task_spec.action_type in ("code", "debug")
+                    and "```" in response.answer
+                ):
+                    # Extract code blocks and analyze
+                    import re as _re
+                    code_blocks = _re.findall(r"```(?:python)?\n(.*?)```", response.answer, _re.DOTALL)
+                    for code_block in code_blocks[:2]:  # Analyze up to 2 blocks
+                        analysis = self.code_synthesizer.analyze(code_block)
+                        if analysis.complexity.time_complexity.value != "unknown":
+                            response.answer += (
+                                f"\n\n**Code Analysis**: "
+                                f"Time: {analysis.complexity.time_complexity.value}, "
+                                f"Space: {analysis.complexity.space_complexity.value}"
+                            )
+                            if analysis.complexity.optimization_suggestions:
+                                response.answer += (
+                                    f" | 💡 {analysis.complexity.optimization_suggestions[0]}"
+                                )
+
+                # Meta-cognitive confidence calibration on every response
+                if self.metacognitive_monitor:
+                    conf_report = self.metacognitive_monitor.assess_confidence(
+                        raw_confidence=response.confidence,
+                        response_text=response.answer,
+                        problem=user_input,
+                        domain=domain_match.primary_domain,
+                    )
+                    response.confidence = conf_report.calibrated_confidence
+
+            except Exception as e:
+                logger.debug(f"[EXPERT] Expert post-processing error (non-fatal): {e}")
+
             if event_callback:
                 event_callback({
                     "type": "execution_step",
@@ -740,6 +1116,55 @@ class AgentController:
 
         # 3) Redact any PII in the response
         response.answer = self.pii_guard.redact(response.answer)
+
+        # ── CCE HYBRID: Hallucination verification ──
+        try:
+            if self.cce_hallucination and response.mode not in (
+                "safety_refused", "output_filtered", "ethics_filtered",
+            ):
+                hd_result = self.cce_hallucination.verify(response.answer)
+                if hd_result.hallucination_score > 0.7:
+                    logger.warning(
+                        f"[CCE HYBRID] High hallucination score: "
+                        f"{hd_result.hallucination_score:.2f}"
+                    )
+                    response.answer += (
+                        "\n\n⚠️ **Grounding Notice**: This response has a lower "
+                        "grounding confidence. Please verify critical claims "
+                        "independently."
+                    )
+                    response.mode += "+grounding_warning"
+                self.metrics.histogram(
+                    "cce.hallucination_score", hd_result.hallucination_score,
+                )
+        except Exception as e:
+            logger.debug(f"[CCE HYBRID] Hallucination check error (non-fatal): {e}")
+
+        # ── CCE HYBRID: Code Sandbox validation ──
+        try:
+            if (
+                self.cce_sandbox
+                and task_spec
+                and task_spec.action_type in ("code", "debug")
+                and "```" in response.answer
+            ):
+                import re as _re_sandbox
+                code_blocks = _re_sandbox.findall(
+                    r"```(?:python)?\n(.*?)```", response.answer, _re_sandbox.DOTALL,
+                )
+                for block in code_blocks[:2]:  # Validate up to 2 blocks
+                    validation = self.cce_sandbox.validate_only(block)
+                    if not validation.is_safe:
+                        violation_names = [str(v) for v in validation.violations[:3]]
+                        response.answer += (
+                            f"\n\n🛡️ **Code Safety Notice**: "
+                            f"Potential concerns detected: {', '.join(violation_names)}. "
+                            f"Review before executing in production."
+                        )
+                        response.mode += "+code_safety_warning"
+                        break  # One warning is enough
+        except Exception as e:
+            logger.debug(f"[CCE HYBRID] Code sandbox error (non-fatal): {e}")
 
         # Step 5: Update conversation + session
         self.conversation.append({"role": "user", "content": user_input})
@@ -830,6 +1255,26 @@ class AgentController:
             # 4. Check if input matches a workflow trigger
             if self.workflow_engine:
                 self.workflow_engine.check_event_triggers(user_input)
+
+            # 5. CCE Hybrid: Real-Time Learning — learn from every interaction
+            if self.cce_learner:
+                is_success = response.confidence >= 0.5
+                duration_ms = (time.time() - start_time) * 1000
+                self.cce_learner.learn(
+                    prompt=user_input[:300],
+                    response=response.answer[:300],
+                    success=is_success,
+                    time_ms=duration_ms,
+                )
+
+            # 6. CCE Hybrid: Store in Infinite Memory for cross-session recall
+            if self.cce_memory:
+                action_type = task_spec.action_type if task_spec else "general"
+                self.cce_memory.store(
+                    key=f"interaction_{int(time.time())}",
+                    content=f"{user_input[:150]} → {response.answer[:200]}",
+                    tags={action_type, response.mode or "direct", domain_match.primary_domain},
+                )
 
         except Exception as e:
             logger.debug(f"[MEGA] Post-processing error (non-fatal): {e}")
