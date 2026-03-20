@@ -660,3 +660,132 @@ export async function queryCouncil(
     });
 }
 
+
+// ══════════════════════════════════════════════════
+// JARVIS Intelligence System
+// ══════════════════════════════════════════════════
+
+export interface JarvisStatus {
+    status: string;
+    version?: string;
+    uptime_seconds?: number;
+    interactions?: number;
+    [key: string]: any;
+}
+
+export async function getJarvisStatus(): Promise<JarvisStatus> {
+    return apiFetch<JarvisStatus>('/jarvis/status');
+}
+
+export async function getJarvisAwareness(): Promise<any> {
+    return apiFetch('/jarvis/awareness');
+}
+
+export async function getJarvisPredictions(): Promise<any> {
+    return apiFetch('/jarvis/predictions');
+}
+
+export async function submitJarvisMission(mission: string): Promise<any> {
+    return apiFetch('/jarvis/mission', {
+        method: 'POST',
+        body: { mission },
+    });
+}
+
+export async function getJarvisKnowledge(): Promise<any> {
+    return apiFetch('/jarvis/knowledge');
+}
+
+export async function getJarvisGuardian(): Promise<any> {
+    return apiFetch('/jarvis/guardian');
+}
+
+
+// ══════════════════════════════════════════════════
+// MEGA Subsystems (Adaptive Learning, Memory, etc.)
+// ══════════════════════════════════════════════════
+
+export interface MegaStatus {
+    message_bus: boolean;
+    semantic_memory: boolean;
+    adaptive_learner: boolean;
+    plugin_manager: boolean;
+    workflow_engine: boolean;
+    project_intelligence: boolean;
+    scheduler: boolean;
+    collaboration: boolean;
+    [key: string]: any;
+}
+
+export async function getMegaStatus(): Promise<MegaStatus> {
+    return apiFetch<MegaStatus>('/mega/status');
+}
+
+export async function getMegaBusEvents(): Promise<any> {
+    return apiFetch('/mega/bus');
+}
+
+export async function getMegaRegistry(): Promise<any> {
+    return apiFetch('/mega/registry');
+}
+
+/** Submit explicit feedback to improve the agent's adaptive learning */
+export async function submitLearningFeedback(
+    feedbackType: 'positive' | 'negative' | 'correction',
+    query: string,
+    response: string,
+    correction?: string,
+): Promise<any> {
+    return apiFetch('/mega/learning/feedback', {
+        method: 'POST',
+        body: { feedback_type: feedbackType, query, response, correction },
+    });
+}
+
+export async function getLearningInsights(): Promise<any> {
+    return apiFetch('/mega/learning/insights');
+}
+
+/** Scan a project directory for intelligence (tech stack, patterns, etc.) */
+export async function scanProject(directory: string): Promise<any> {
+    return apiFetch('/mega/project/scan', {
+        method: 'POST',
+        body: { directory },
+    });
+}
+
+/** Create or trigger a named workflow */
+export async function createWorkflow(
+    name: string,
+    steps: string[],
+    trigger?: string,
+): Promise<any> {
+    return apiFetch('/mega/workflow', {
+        method: 'POST',
+        body: { name, steps, trigger },
+    });
+}
+
+export async function getWorkflows(): Promise<any> {
+    return apiFetch('/mega/workflows');
+}
+
+export async function getSemanticMemory(): Promise<any> {
+    return apiFetch('/mega/memory');
+}
+
+export async function getCollaborationStatus(): Promise<any> {
+    return apiFetch('/mega/collaboration');
+}
+
+export async function getPlugins(): Promise<any> {
+    return apiFetch('/mega/plugins');
+}
+
+export async function getSchedulerStatus(): Promise<any> {
+    return apiFetch('/mega/scheduler');
+}
+
+export async function getLocalModelStatus(): Promise<any> {
+    return apiFetch('/mega/local-model');
+}
