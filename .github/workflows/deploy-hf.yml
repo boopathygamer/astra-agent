@@ -26,25 +26,31 @@ jobs:
       - name: Push to Hugging Face Spaces
         env:
           HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
           if [ -z "$HF_WRITE_TOKEN" ]; then
             echo "Error: HF_WRITE_TOKEN secret is missing!"
             exit 1
           fi
-          echo "Deploying backend to Space: boopathygamer/astra-agent-backend..."
+          if [ -z "$HF_USERNAME" ]; then
+            echo "Error: HF_USERNAME secret is missing!"
+            exit 1
+          fi
+          echo "Deploying backend to Space: $HF_USERNAME/astra-agent-backend..."
           python -c '
           import os
           from huggingface_hub import HfApi
           token = os.environ.get("HF_WRITE_TOKEN")
+          username = os.environ.get("HF_USERNAME").strip()
           api = HfApi(token=token)
-          repo_id = "boopathygamer/astra-agent-backend"
+          repo_id = f"{username}/astra-agent-backend"
           print(f"Ensuring Space {repo_id} exists...")
           try:
               api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="docker", exist_ok=True)
               print("Space verified!")
           except Exception as e:
               print(f"Warning/Error creating space (check if token has WRITE perm): {e}")
-          print("Uploading files to boopathygamer/astra-agent-backend space...")
+          print(f"Uploading files to {repo_id} space...")
           api.upload_folder(folder_path="./backend", repo_id=repo_id, repo_type="space", commit_message="Deploy backend via Actions")
           print("Upload completely successfully!")
           '
