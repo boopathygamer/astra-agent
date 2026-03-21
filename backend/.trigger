@@ -1,1 +1,1 @@
-# This file is used to trigger the GitHub Actions deploy-hf.yml pipeline.
+# Trigger deploy-hf.yml pipeline after manual space creation.
