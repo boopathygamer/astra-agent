@@ -25,7 +25,7 @@ jobs:
 
       - name: Push to Hugging Face Spaces
         env:
-          HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
+          HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN || secrets.HF_TOKEN }}
           HF_USERNAME: ${{ secrets.HF_USERNAME || github.repository_owner }}
         run: |
           if [ -z "$HF_WRITE_TOKEN" ]; then
