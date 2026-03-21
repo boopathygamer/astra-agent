@@ -32,4 +32,11 @@ jobs:
             exit 1
           fi
           echo "Deploying backend to Space: boopathygamer/astra-agent-backend..."
-          huggingface-cli upload boopathygamer/astra-agent-backend ./backend . --repo-type space --commit-message "Deploy backend to Spaces"
+          python -c '
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ.get("HF_TOKEN"))
+          print("Uploading files to boopathygamer/astra-agent-backend space...")
+          api.upload_folder(folder_path="./backend", repo_id="boopathygamer/astra-agent-backend", repo_type="space", commit_message="Deploy backend via Actions")
+          print("Upload completely successfully!")
+          '
