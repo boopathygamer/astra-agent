@@ -1,0 +1,77 @@
+name: Deploy Astra Backend to Oracle Cloud
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-oracle.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-backend
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          # Crucial addition: build for both standard x86 and Oracle ARM processors
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy-to-oracle:
+    needs: build-and-push-image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Execute SSH commands on Oracle VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          # You MUST add ORACLE_HOST_IP and ORACLE_SSH_KEY to your GitHub Secrets
+          host: ${{ secrets.ORACLE_HOST_IP }}
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: |
+            echo "Pulling latest backend image..."
+            # Stop any existing container
+            sudo docker stop astra-backend || true
+            sudo docker rm astra-backend || true
+            # Pull the new ARM architecture image
+            sudo docker pull ghcr.io/boopathygamer/astra-agent-backend:main
+            # Run it on port 8000
+            sudo docker run -d --name astra-backend \
+              -p 8000:8000 \
+              --restart unless-stopped \
+              ghcr.io/boopathygamer/astra-agent-backend:main
