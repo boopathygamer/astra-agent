@@ -1,0 +1,17 @@
+{
+  "name": "astra-agent-backend",
+  "description": "Astra Agent Backend API running on Camber Cloud",
+  "imageUrl": "ghcr.io/boopathygamer/astra-agent-backend:main",
+  "port": 8000,
+  "command": ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
+  "resources": {
+    "cpu": 2,
+    "memory": "4Gi"
+  },
+  "env": [
+    {
+      "name": "ENVIRONMENT",
+      "value": "production"
+    }
+  ]
+}
