@@ -1,1 +1,1 @@
-# Trigger final deploy-hf.yml pipeline using the boopathygamer1212 HF_USERNAME secret.
+# Final trigger to cleanly bypass HF_WRITE_TOKEN via HF_TOKEN locally.
