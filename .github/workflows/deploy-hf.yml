@@ -26,14 +26,10 @@ jobs:
       - name: Push to Hugging Face Spaces
         env:
           HF_WRITE_TOKEN: ${{ secrets.HF_WRITE_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME || github.repository_owner }}
         run: |
           if [ -z "$HF_WRITE_TOKEN" ]; then
             echo "Error: HF_WRITE_TOKEN secret is missing!"
-            exit 1
-          fi
-          if [ -z "$HF_USERNAME" ]; then
-            echo "Error: HF_USERNAME secret is missing!"
             exit 1
           fi
           echo "Deploying backend to Space: $HF_USERNAME/astra-agent-backend..."
