@@ -1,3 +1,4 @@
+# Auto-trigger HF Deployment
 # ── Build stage ──────────────────────────────────
 FROM python:3.11-slim AS builder
 
