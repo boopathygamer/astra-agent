@@ -144,7 +144,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         
         # ── Security headers ──
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        # X-Frame-Options removed to allow Hugging Face Spaces iframe embedding
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-Request-ID"] = request_id
@@ -384,6 +384,12 @@ async def health_check():
         "version": "5.0.0",
         "subsystems": subsystems,
     }
+
+
+@app.get("/")
+async def read_root():
+    """Root endpoint for Hugging Face Spaces iframe connectivity."""
+    return {"message": "Astra Agent Backend is Running", "docs_url": "/docs"}
 
 
 # ──────────────────────────────────────────────
