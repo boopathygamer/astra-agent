@@ -31,11 +31,11 @@ COPY . .
 RUN mkdir -p data reports
 
 # Expose the API port
-EXPOSE 8000
+EXPOSE 7860
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:7860/health || exit 1
 
 # Run with uvicorn
-CMD ["uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--log-level", "info"]
+CMD ["uvicorn", "api.server:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1", "--log-level", "info"]
