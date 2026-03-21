@@ -35,8 +35,16 @@ jobs:
           python -c '
           import os
           from huggingface_hub import HfApi
-          api = HfApi(token=os.environ.get("HF_TOKEN"))
+          token = os.environ.get("HF_TOKEN")
+          api = HfApi(token=token)
+          repo_id = "boopathygamer/astra-agent-backend"
+          print(f"Ensuring Space {repo_id} exists...")
+          try:
+              api.create_repo(repo_id=repo_id, repo_type="space", space_sdk="docker", exist_ok=True)
+              print("Space verified!")
+          except Exception as e:
+              print(f"Warning/Error creating space (check if token has WRITE perm): {e}")
           print("Uploading files to boopathygamer/astra-agent-backend space...")
-          api.upload_folder(folder_path="./backend", repo_id="boopathygamer/astra-agent-backend", repo_type="space", commit_message="Deploy backend via Actions")
+          api.upload_folder(folder_path="./backend", repo_id=repo_id, repo_type="space", commit_message="Deploy backend via Actions")
           print("Upload completely successfully!")
           '
