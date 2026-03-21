@@ -1,1 +1,1 @@
-# Trigger deploy-hf.yml pipeline after manual space creation.
+# Trigger final deploy-hf.yml pipeline using the boopathygamer1212 HF_USERNAME secret.
