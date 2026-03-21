@@ -9,32 +9,27 @@ on:
       - '.github/workflows/deploy-hf.yml'
 
 jobs:
-  sync-to-hub:
+  deploy-to-hf-spaces:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Push to Hugging Face
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install huggingface_hub
+        run: pip install huggingface_hub
+
+      - name: Push to Hugging Face Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
-          
-          echo "Cloning Hugging Face space..."
-          git clone https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/astra-agent-backend hf_space
-          
-          echo "Syncing files..."
-          cd hf_space
-          # Remove old files but keep .git
-          rm -rf *
-          # Copy backend files to the root of the Hugging Face repo
-          cp -r ../backend/* .
-          
-          echo "Committing and pushing..."
-          git add .
-          git commit -m "Auto-sync from GitHub Actions" || echo "No changes to commit"
-          git push https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/astra-agent-backend main
+          if [ -z "$HF_TOKEN" ]; then
+            echo "Error: HF_TOKEN secret is missing!"
+            exit 1
+          fi
+          echo "Deploying backend to Space: boopathygamer/astra-agent-backend..."
+          huggingface-cli upload boopathygamer/astra-agent-backend ./backend . --repo-type space --commit-message "Deploy backend to Spaces"
